@@ -34,7 +34,7 @@ function App() {
   return (
     <LanguageProvider>
       <CartProvider>
-        <Router basename="/sertaurant">
+        <Router basename="/demashqi-restaurant-v.3.2">
           <ScrollToTop />
           <Layout>
             <Routes>

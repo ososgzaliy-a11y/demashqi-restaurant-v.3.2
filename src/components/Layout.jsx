@@ -157,8 +157,8 @@ const Footer = () => {
             window.__adminClicks = (window.__adminClicks || 0) + 1;
             if (window.__adminClicks >= 3) {
               window.__adminClicks = 0;
-              window.location.pathname.includes('sertaurant')
-                ? window.location.assign('/sertaurant/admin')
+              window.location.pathname.includes('demashqi-restaurant-v.3.2')
+                ? window.location.assign('/demashqi-restaurant-v.3.2/admin')
                 : window.location.assign('/admin');
             }
           }}
