@@ -1,10 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote } from 'lucide-react';
+import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle } from 'lucide-react';
+
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
+  if (!isOpen) return null;
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+      <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem', borderRadius: '16px', border: '1px solid var(--border-color)', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+        <AlertTriangle size={48} color="var(--gold)" style={{ marginBottom: '1.5rem' }} />
+        <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '1rem' }}>{title}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem', lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button onClick={onConfirm} disabled={countdown > 0} className="btn-primary" style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', opacity: countdown > 0 ? 0.6 : 1, cursor: countdown > 0 ? 'not-allowed' : 'pointer' }}>
+            {countdown > 0 ? `${confirmText} (${countdown})` : confirmText}
+          </button>
+          <button onClick={onClose} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+            {cancelText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatus, clearCart, navigate, language }) {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmCountdown, setConfirmCountdown] = useState(5);
+
+  useEffect(() => {
+    let timer;
+    if (showConfirmModal && confirmCountdown > 0) {
+      timer = setTimeout(() => setConfirmCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [showConfirmModal, confirmCountdown]);
+
   const t = {
     processing: language === 'ar' ? 'جاري المعالجة...' : 'Processing your order...',
     networkError: language === 'ar' ? 'خطأ في الشبكة. يرجى المحاولة لاحقاً.' : 'Network error. Please try again later.',
@@ -42,8 +74,13 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
       return;
     }
 
+    setShowConfirmModal(true);
+    setConfirmCountdown(5);
+  };
+
+  const proceedCheckout = async () => {
+    setShowConfirmModal(false);
     setStatus({ type: 'loading', message: t.processing });
-    
     let addressParts = [formData.street];
     if (formData.building) addressParts.push(`${language === 'ar' ? 'مبنى' : 'Building'} ${formData.building}`);
     if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
@@ -203,6 +240,17 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           )}
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={proceedCheckout}
+        countdown={confirmCountdown}
+        title={language === 'ar' ? 'تأكيد الطلب' : 'Confirm Order'}
+        message={language === 'ar' ? 'يرجى مراجعة طلبك قبل التأكيد النهائي. هل أنت متأكد من إتمام الطلب؟' : 'Please review your order before final confirmation. Are you sure you want to proceed?'}
+        confirmText={language === 'ar' ? 'تأكيد الآن' : 'Confirm Now'}
+        cancelText={language === 'ar' ? 'إلغاء' : 'Cancel'}
+      />
     </form>
   );
 }

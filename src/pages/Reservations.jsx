@@ -1,5 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { AlertTriangle } from 'lucide-react';
+
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
+  if (!isOpen) return null;
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+      <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem', borderRadius: '16px', border: '1px solid var(--border-color)', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+        <AlertTriangle size={48} color="var(--gold)" style={{ marginBottom: '1.5rem' }} />
+        <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '1rem' }}>{title}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem', lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button type="button" onClick={onConfirm} disabled={countdown > 0} className="btn-primary" style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', opacity: countdown > 0 ? 0.6 : 1, cursor: countdown > 0 ? 'not-allowed' : 'pointer' }}>
+            {countdown > 0 ? `${confirmText} (${countdown})` : confirmText}
+          </button>
+          <button type="button" onClick={onClose} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+            {cancelText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Reservations() {
   const { language } = useLanguage();
@@ -15,6 +37,16 @@ export default function Reservations() {
   });
   const [status, setStatus] = useState({ type: '', message: '' });
   const [bookedSlots, setBookedSlots] = useState({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmCountdown, setConfirmCountdown] = useState(5);
+
+  useEffect(() => {
+    let timer;
+    if (showConfirmModal && confirmCountdown > 0) {
+      timer = setTimeout(() => setConfirmCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [showConfirmModal, confirmCountdown]);
 
   useEffect(() => {
     const saved = localStorage.getItem('demashqi_booked_slots');
@@ -118,7 +150,7 @@ export default function Reservations() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone || !formData.date || !formData.time || !formData.guests) {
-      setStatus({ type: 'error', message: language === 'ar' ? 'الرجاء ملء جميع الحقول المطلوبة.' : 'Please fill in all required fields.' });
+      setStatus({ type: 'error', message: language === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields' });
       return;
     }
 
@@ -127,7 +159,13 @@ export default function Reservations() {
       return;
     }
 
-    setStatus({ type: 'loading', message: language === 'ar' ? 'جاري التأكيد...' : 'Submitting...' });
+    setShowConfirmModal(true);
+    setConfirmCountdown(5);
+  };
+
+  const proceedReservation = async () => {
+    setShowConfirmModal(false);
+    setStatus({ type: 'loading', message: language === 'ar' ? 'جاري التحقق...' : 'Verifying availability...' });
 
     const payload = { ...formData, tableId: 'TBD' };
 
@@ -240,6 +278,17 @@ export default function Reservations() {
           </form>
         </div>
       </section>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={proceedReservation}
+        countdown={confirmCountdown}
+        title={language === 'ar' ? 'تأكيد الحجز' : 'Confirm Reservation'}
+        message={language === 'ar' ? `يرجى تأكيد الحجز بتاريخ ${formData.date} في تمام الساعة ${formData.time} لـ ${formData.guests} أشخاص.` : `Please confirm your reservation on ${formData.date} at ${formData.time} for ${formData.guests} guests.`}
+        confirmText={language === 'ar' ? 'تأكيد الآن' : 'Confirm Now'}
+        cancelText={language === 'ar' ? 'إلغاء' : 'Cancel'}
+      />
     </div>
   );
 }
