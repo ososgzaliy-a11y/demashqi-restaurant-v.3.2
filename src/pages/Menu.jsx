@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { searchMenuItems } from '../utils/searchUtils';
 
 const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
 
@@ -118,17 +119,12 @@ export default function Menu() {
     return acc;
   }, []);
 
-  const searchResults = searchQuery
-    ? allItemsFlattened.filter(item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.desc && item.desc.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
-    : [];
+  const searchResults = searchMenuItems(searchQuery, allItemsFlattened);
 
   return (
     <div className="fade-in">
       {/* Header is smaller if a category is active */}
-      <header className="page-header" style={{ backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${MenuHero})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', paddingTop: activeCategoryKey === "all" ? '12rem' : '10rem', paddingBottom: activeCategoryKey === "all" ? '6rem' : '4rem', transition: 'all 0.3s ease' }}>
+      <header className="page-header no-interaction" style={{ backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${MenuHero})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', paddingTop: activeCategoryKey === "all" ? '12rem' : '10rem', paddingBottom: activeCategoryKey === "all" ? '6rem' : '4rem', transition: 'all 0.3s ease' }}>
         <div className="container" style={{ textAlign: 'center' }}>
           <h1 style={{ color: 'var(--gold)', textShadow: '0 4px 12px rgba(0,0,0,0.8)', fontSize: activeCategoryKey === "all" ? '4rem' : '2.5rem', transition: 'all 0.3s ease' }}>{t('menu.title')}</h1>
           {activeCategoryKey === "all" && <p style={{ fontSize: '1.4rem', color: '#fff', marginTop: '1rem', fontWeight: 'bold' }}>{t('menu.subtitle')}</p>}

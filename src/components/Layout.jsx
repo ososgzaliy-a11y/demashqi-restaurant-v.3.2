@@ -20,8 +20,17 @@ const Navbar = () => {
 
   // Prevent body scroll when menu is open
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
   }, [menuOpen]);
 
   const navLinks = [
@@ -138,10 +147,10 @@ const Navbar = () => {
 const Footer = () => {
   const { t } = useLanguage();
   return (
-    <footer className="footer">
+    <footer className="footer no-interaction">
       <div className="container">
         <div className="footer-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <img src={LogoImg} alt="Al Demashqi Logo" style={{ height: '80px', marginBottom: '1rem', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
+          <img src={LogoImg} alt="Al Demashqi Logo" draggable="false" style={{ height: '80px', marginBottom: '1rem', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
           <p>{t('footer.desc')}</p>
         </div>
         <div className="nav-links" style={{ justifyContent: 'center', marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>

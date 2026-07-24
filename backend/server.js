@@ -32,9 +32,11 @@ app.use('/api/', apiLimiter);
 // Schemas for input validation
 const reservationSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
-  email: z.string().email("Invalid email address").max(150),
+  email: z.string().email("Invalid email address").max(150).optional().or(z.literal('')),
+  phone: z.string().min(7, "Phone number is required").max(20),
   date: z.string().max(20),
   time: z.string().max(20),
+  tableId: z.string().max(50),
   guests: z.number().int().positive().max(100)
 });
 
@@ -94,8 +96,8 @@ app.post('/api/create-payment-intent', async (req, res) => {
 app.post('/api/reservations', (req, res, next) => {
   try {
     const data = reservationSchema.parse(req.body);
-    const stmt = db.prepare('INSERT INTO reservations (name, email, date, time, guests) VALUES (?, ?, ?, ?, ?)');
-    stmt.run([data.name, data.email, data.date, data.time, data.guests], function(err) {
+    const stmt = db.prepare('INSERT INTO reservations (name, email, phone, date, time, guests, tableId) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    stmt.run([data.name, data.email, data.phone, data.date, data.time, data.guests, data.tableId], function(err) {
       if (err) {
         return next(err);
       }

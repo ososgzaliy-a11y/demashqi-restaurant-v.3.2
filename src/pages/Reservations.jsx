@@ -3,12 +3,14 @@ import { useLanguage } from '../context/LanguageContext';
 
 export default function Reservations() {
   const { language } = useLanguage();
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     date: '',
     time: '',
+    tableId: '',
     guests: ''
   });
   const [status, setStatus] = useState({ type: '', message: '' });
@@ -32,24 +34,72 @@ export default function Reservations() {
   };
   const availableDates = generateDates();
 
-  const baseTimeSlots = [
-    { time: '12:00 PM', defaultAvailable: true },
-    { time: '01:00 PM', defaultAvailable: true },
-    { time: '02:00 PM', defaultAvailable: false }, // Simulating hardcoded unavailable
-    { time: '03:30 PM', defaultAvailable: true },
-    { time: '05:00 PM', defaultAvailable: false },
-    { time: '06:30 PM', defaultAvailable: true },
-    { time: '07:00 PM', defaultAvailable: true },
-    { time: '08:30 PM', defaultAvailable: true },
-    { time: '09:00 PM', defaultAvailable: true },
-    { time: '10:00 PM', defaultAvailable: false }
+  const restaurantTables = [
+    // VIP Rooms (Top)
+    { id: 'V1', name: 'Elegant Suite 1', maxGuests: 8, minGuests: 6, type: 'round', top: '16.5%', left: '16.5%' },
+    { id: 'V2', name: 'Elegant Suite 2', maxGuests: 8, minGuests: 6, type: 'round', top: '16.5%', left: '44%' },
+    { id: 'V3', name: 'Elegant Suite 3', maxGuests: 8, minGuests: 6, type: 'round', top: '16.5%', left: '66%' },
+
+    // Main Hall (15 tables)
+    { id: 'M1', name: 'Family Table 1', maxGuests: 4, minGuests: 1, type: 'rect', top: '45%', left: '40%' },
+    { id: 'M2', name: 'Family Table 2', maxGuests: 4, minGuests: 1, type: 'rect', top: '45%', left: '50%' },
+    { id: 'M3', name: 'Family Table 3', maxGuests: 4, minGuests: 1, type: 'rect', top: '45%', left: '60%' },
+    { id: 'M4', name: 'Family Table 4', maxGuests: 4, minGuests: 1, type: 'rect', top: '45%', left: '70%' },
+    { id: 'M5', name: 'Family Table 5', maxGuests: 4, minGuests: 1, type: 'rect', top: '45%', left: '80%' },
+
+    { id: 'M6', name: 'Family Table 6', maxGuests: 4, minGuests: 1, type: 'rect', top: '55%', left: '40%' },
+    { id: 'M7', name: 'Family Table 7', maxGuests: 4, minGuests: 1, type: 'rect', top: '55%', left: '50%' },
+    { id: 'M8', name: 'Family Table 8', maxGuests: 4, minGuests: 1, type: 'rect', top: '55%', left: '60%' },
+    { id: 'M9', name: 'Family Table 9', maxGuests: 4, minGuests: 1, type: 'rect', top: '55%', left: '70%' },
+    { id: 'M10', name: 'Family Table 10', maxGuests: 4, minGuests: 1, type: 'rect', top: '55%', left: '80%' },
+
+    { id: 'M11', name: 'Family Table 11', maxGuests: 4, minGuests: 1, type: 'rect', top: '65%', left: '40%' },
+    { id: 'M12', name: 'Family Table 12', maxGuests: 4, minGuests: 1, type: 'rect', top: '65%', left: '50%' },
+    { id: 'M13', name: 'Family Table 13', maxGuests: 4, minGuests: 1, type: 'rect', top: '65%', left: '60%' },
+    { id: 'M14', name: 'Family Table 14', maxGuests: 4, minGuests: 1, type: 'rect', top: '65%', left: '70%' },
+    { id: 'M15', name: 'Family Table 15', maxGuests: 4, minGuests: 1, type: 'rect', top: '65%', left: '80%' },
+
+    // VIP Rooms (Bottom)
+    { id: 'V4', name: 'Elegant Suite 4', maxGuests: 8, minGuests: 6, type: 'round', top: '83.5%', left: '37.5%' },
+    { id: 'V5', name: 'Elegant Suite 5', maxGuests: 8, minGuests: 6, type: 'round', top: '83.5%', left: '62.5%' },
+    { id: 'V6', name: 'Elegant Suite 6', maxGuests: 8, minGuests: 6, type: 'round', top: '83.5%', left: '87.5%' },
+
+    // Booths (Bottom Left)
+    { id: 'B1', name: 'Cozy Corner 1', maxGuests: 6, minGuests: 4, type: 'booth', top: '75%', left: '12.5%' },
+    { id: 'B2', name: 'Cozy Corner 2', maxGuests: 6, minGuests: 4, type: 'booth', top: '85%', left: '12.5%' },
+    { id: 'B3', name: 'Cozy Corner 3', maxGuests: 6, minGuests: 4, type: 'booth', top: '95%', left: '12.5%' },
   ];
+
+  const baseTimeSlots = [];
+  let currentHour = 12;
+  let currentMinute = 0;
+  for (let i = 0; i < 17; i++) { // 12:00 PM to 8:00 PM
+    const formattedHour = currentHour === 12 ? 12 : currentHour % 12;
+    const formattedMinute = currentMinute === 0 ? '00' : '30';
+    baseTimeSlots.push({ time: `${formattedHour.toString().padStart(2, '0')}:${formattedMinute} PM`, defaultAvailable: true });
+    currentMinute += 30;
+    if (currentMinute === 60) {
+      currentMinute = 0;
+      currentHour += 1;
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let parsedValue = value;
+    
+    if (type === 'checkbox') {
+      parsedValue = checked;
+    } else if (name === 'guests') {
+      parsedValue = value ? parseInt(value) : '';
+      if (parsedValue > 12) parsedValue = 12;
+    } else if (name === 'phone') {
+      parsedValue = value.replace(/\D/g, '').slice(0, 11);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (name === 'guests' ? parseInt(value) : value)
+      [name]: parsedValue
     }));
   };
 
@@ -61,38 +111,40 @@ export default function Reservations() {
     setFormData(prev => ({ ...prev, time: timeStr }));
   };
 
+  const selectTable = (tableId) => {
+    setFormData(prev => ({ ...prev, tableId }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.date || !formData.time) {
-      setStatus({ type: 'error', message: language === 'ar' ? 'الرجاء تحديد التاريخ والوقت.' : 'Please select a date and time.' });
+    if (!formData.name || !formData.phone || !formData.date || !formData.time || !formData.guests) {
+      setStatus({ type: 'error', message: language === 'ar' ? 'الرجاء ملء جميع الحقول المطلوبة.' : 'Please fill in all required fields.' });
+      return;
+    }
+
+    if (formData.phone.length !== 11) {
+      setStatus({ type: 'error', message: language === 'ar' ? 'يجب أن يتكون رقم الهاتف من ١١ رقماً' : 'it must be 11 number' });
       return;
     }
 
     setStatus({ type: 'loading', message: language === 'ar' ? 'جاري التأكيد...' : 'Submitting...' });
-    
+
+    const payload = { ...formData, tableId: 'TBD' };
+
     try {
       const response = await fetch(`http://${window.location.hostname}:3000/api/reservations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error?.[0]?.message || 'Failed to submit reservation');
       }
 
-      // Track booked slot
-      const newBookedSlots = { ...bookedSlots };
-      if (!newBookedSlots[formData.date]) {
-        newBookedSlots[formData.date] = [];
-      }
-      newBookedSlots[formData.date].push(formData.time);
-      setBookedSlots(newBookedSlots);
-      localStorage.setItem('demashqi_booked_slots', JSON.stringify(newBookedSlots));
-
       setStatus({ type: 'success', message: language === 'ar' ? 'تم تأكيد الحجز!' : 'Reservation confirmed!' });
-      setFormData(prev => ({ ...prev, name: '', email: '', date: '', time: '', guests: '' }));
+      setFormData(prev => ({ ...prev, name: '', email: '', date: '', time: '', tableId: '', guests: '' }));
     } catch (error) {
       setStatus({ type: 'error', message: language === 'ar' ? 'حدث خطأ أثناء إرسال الحجز.' : 'An error occurred while submitting.' });
     }
@@ -118,9 +170,9 @@ export default function Reservations() {
               {status.message}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <label style={{ fontSize: '1.3rem', color: 'var(--gold)', fontWeight: 'bold' }}>
                 {language === 'ar' ? 'اختر اليوم' : 'Select a Date'}
@@ -132,7 +184,7 @@ export default function Reservations() {
                   const dayName = new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' }).format(d);
                   const dayNum = new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric' }).format(d);
                   const monthName = new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' }).format(d);
-                  
+
                   return (
                     <button type="button" key={i} onClick={() => selectDate(d)} style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', height: '100px', borderRadius: '12px', border: `2px solid ${isSelected ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: isSelected ? 'rgba(200, 16, 46, 0.1)' : 'transparent', color: isSelected ? 'var(--brand-red)' : 'var(--text-primary)', transition: 'all 0.3s ease' }} onMouseEnter={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--gold)')} onMouseLeave={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--border-color)')}>
                       <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{dayName}</span>
@@ -151,13 +203,10 @@ export default function Reservations() {
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '1rem' }}>
                   {baseTimeSlots.map((slot, i) => {
-                    const isBooked = bookedSlots[formData.date]?.includes(slot.time);
-                    const isAvailable = slot.defaultAvailable && !isBooked;
                     const isSelected = formData.time === slot.time;
-                    
                     return (
-                      <button type="button" key={i} disabled={!isAvailable} onClick={() => selectTime(slot.time)} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', border: `2px solid ${isSelected ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: isSelected ? 'var(--brand-red)' : 'transparent', color: isSelected ? '#fff' : (isAvailable ? 'var(--text-primary)' : 'var(--border-color)'), opacity: isAvailable ? 1 : 0.5, cursor: isAvailable ? 'pointer' : 'not-allowed', transition: 'all 0.3s ease' }} onMouseEnter={e => isAvailable && !isSelected && (e.currentTarget.style.borderColor = 'var(--brand-red)')} onMouseLeave={e => isAvailable && !isSelected && (e.currentTarget.style.borderColor = 'var(--border-color)')}>
-                        {isBooked ? (language === 'ar' ? 'محجوز' : 'Booked') : slot.time}
+                      <button type="button" key={i} onClick={() => selectTime(slot.time)} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', border: `2px solid ${isSelected ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: isSelected ? 'var(--brand-red)' : 'transparent', color: isSelected ? '#fff' : 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.3s ease' }} onMouseEnter={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--brand-red)')} onMouseLeave={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--border-color)')}>
+                        {slot.time}
                       </button>
                     );
                   })}
@@ -171,13 +220,19 @@ export default function Reservations() {
               </label>
               <div className="responsive-grid-2">
                 <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder={language === 'ar' ? 'الاسم الكامل' : 'Full Name'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
-                <input type="number" id="guests" name="guests" min="1" max="20" value={formData.guests} onChange={handleChange} required placeholder={language === 'ar' ? 'عدد الأشخاص' : 'Number of Guests'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+                <input type="number" id="guests" name="guests" min="1" max="12" value={formData.guests} onChange={handleChange} required placeholder={language === 'ar' ? 'عدد الأشخاص' : 'Number of Guests'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
               </div>
-              <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required placeholder={language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} required maxLength="11" placeholder={language === 'ar' ? 'رقم الهاتف' : 'Phone Number'} style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+                <span style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', color: '#25D366', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span>📱</span>{language === 'ar' ? 'داعم للواتساب *' : 'Supports WhatsApp *'}
+                </span>
+              </div>
+              <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} placeholder={language === 'ar' ? 'البريد الإلكتروني (اختياري)' : 'Email Address (optional)'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
             </div>
 
+            {/* Table selection removed entirely */}
 
-            
             <button type="submit" className="btn-primary" style={{ marginTop: '1rem', padding: '1.2rem', fontSize: '1.3rem', borderRadius: '50px' }} disabled={status.type === 'loading'}>
               {status.type === 'loading' ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (language === 'ar' ? 'تأكيد الحجز' : 'Confirm Reservation')}
             </button>

@@ -16,6 +16,7 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^6.7.0",
     "@stripe/stripe-js": "^9.9.0",
+    "fuse.js": "^7.5.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",

@@ -7,7 +7,7 @@ export default function AboutUs() {
 
   return (
     <div className="fade-in">
-      <header className="page-header" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${import.meta.env.BASE_URL}Images/44.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <header className="page-header no-interaction" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${import.meta.env.BASE_URL}Images/44.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div className="container" style={{ textAlign: 'center', padding: '0 1rem' }}>
           <h1 className="scale-in" style={{ fontSize: 'clamp(2.2rem, 7vw, 5rem)', color: 'var(--gold)', textShadow: '0 8px 20px rgba(0,0,0,0.9)', marginBottom: '1rem' }}>
             {language === 'ar' ? 'قصتنا' : 'Our Story'}
