@@ -179,7 +179,7 @@ app.get('/api/admin/orders', (req, res, next) => {
 app.put('/api/admin/orders/:id', (req, res, next) => {
   const { id } = req.params;
   const { status } = req.body;
-  const validStatuses = ['pending', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+  const validStatuses = ['pending', 'preparing', 'on_the_way', 'completed', 'cancelled'];
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
@@ -196,6 +196,22 @@ app.get('/api/admin/reservations', (req, res, next) => {
   db.all('SELECT * FROM reservations ORDER BY id DESC', [], (err, rows) => {
     if (err) return next(err);
     res.json(rows);
+  });
+});
+
+// Admin Update Reservation Status
+app.put('/api/admin/reservations/:id', (req, res, next) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  db.run('UPDATE reservations SET status = ? WHERE id = ?', [status, id], function(err) {
+    if (err) return next(err);
+    if (this.changes === 0) return res.status(404).json({ error: 'Reservation not found' });
+    res.json({ success: true, id, status });
   });
 });
 

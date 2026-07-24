@@ -37,6 +37,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
               console.log('Migrated reservations table: added tableId');
             }
           });
+          // Migration: add status column for reservation tracking
+          db.run(`ALTER TABLE reservations ADD COLUMN status TEXT DEFAULT 'pending';`, (err) => {
+            if (err) {
+              // Ignore error if column already exists
+            } else {
+              console.log('Migrated reservations table: added status');
+            }
+          });
         });
       
       db.run(`CREATE TABLE IF NOT EXISTS contacts (
