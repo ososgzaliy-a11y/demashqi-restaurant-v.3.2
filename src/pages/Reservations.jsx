@@ -165,11 +165,6 @@ export default function Reservations() {
 
       <section className="section container" style={{ maxWidth: '860px' }}>
         <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: 'clamp(1.5rem, 5vw, 4rem)', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-          {status.message && (
-            <div className="fade-in" style={{ padding: '1.5rem', marginBottom: '2rem', borderRadius: '8px', backgroundColor: status.type === 'success' ? 'rgba(46, 204, 113, 0.1)' : 'rgba(200, 16, 46, 0.1)', color: status.type === 'success' ? '#2ecc71' : 'var(--brand-red)', border: `1px solid ${status.type === 'success' ? '#2ecc71' : 'var(--brand-red)'}`, textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
-              {status.message}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
 
@@ -236,6 +231,12 @@ export default function Reservations() {
             <button type="submit" className="btn-primary" style={{ marginTop: '1rem', padding: '1.2rem', fontSize: '1.3rem', borderRadius: '50px' }} disabled={status.type === 'loading'}>
               {status.type === 'loading' ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (language === 'ar' ? 'تأكيد الحجز' : 'Confirm Reservation')}
             </button>
+
+            {status.message && (
+              <div className="fade-in" style={{ padding: '1.5rem', marginTop: '1.5rem', borderRadius: '8px', backgroundColor: status.type === 'success' ? 'rgba(46, 204, 113, 0.1)' : 'rgba(200, 16, 46, 0.1)', color: status.type === 'success' ? '#2ecc71' : 'var(--brand-red)', border: `1px solid ${status.type === 'success' ? '#2ecc71' : 'var(--brand-red)'}`, textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                {status.message}
+              </div>
+            )}
           </form>
         </div>
       </section>
