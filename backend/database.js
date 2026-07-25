@@ -63,6 +63,32 @@ const db = new sqlite3.Database(dbPath, (err) => {
         paymentMethod TEXT NOT NULL,
         status TEXT DEFAULT 'pending',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`, () => {
+        db.run(`ALTER TABLE orders ADD COLUMN phone TEXT NOT NULL DEFAULT ''`, (err) => {});
+        db.run(`ALTER TABLE orders ADD COLUMN notes TEXT DEFAULT ''`, (err) => {});
+      });
+
+      db.run(`CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE NOT NULL,
+        name_en TEXT NOT NULL,
+        name_ar TEXT NOT NULL
+      )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_key TEXT NOT NULL,
+        key TEXT UNIQUE NOT NULL,
+        name_en TEXT NOT NULL,
+        name_ar TEXT NOT NULL,
+        desc_en TEXT NOT NULL,
+        desc_ar TEXT NOT NULL,
+        price TEXT NOT NULL,
+        img TEXT,
+        weight TEXT,
+        sauces TEXT,
+        ingredients TEXT,
+        is_popular INTEGER DEFAULT 0
       )`);
     });
   }

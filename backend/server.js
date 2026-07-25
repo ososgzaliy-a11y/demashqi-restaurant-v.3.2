@@ -55,6 +55,8 @@ const orderSchema = z.object({
   }).passthrough()).max(100),
   total: z.number().positive(),
   address: z.string().min(5, "Address is required").max(500),
+  phone: z.string().min(7, "Phone is required").max(20),
+  notes: z.string().max(1000).optional(),
   paymentMethod: z.string().max(50)
 });
 
@@ -136,8 +138,8 @@ app.post('/api/contact', (req, res, next) => {
 app.post('/api/orders', (req, res, next) => {
   try {
     const data = orderSchema.parse(req.body);
-    const stmt = db.prepare('INSERT INTO orders (items, total, address, paymentMethod) VALUES (?, ?, ?, ?)');
-    stmt.run([JSON.stringify(data.items), data.total, data.address, data.paymentMethod], function(err) {
+    const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod) VALUES (?, ?, ?, ?, ?, ?)');
+    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod], function(err) {
       if (err) {
         return next(err);
       }
@@ -150,6 +152,84 @@ app.post('/api/orders', (req, res, next) => {
     }
     next(error);
   }
+});
+
+// --- Categories Endpoints ---
+app.get('/api/categories', (req, res, next) => {
+  db.all('SELECT * FROM categories', [], (err, rows) => {
+    if (err) return next(err);
+    res.json(rows);
+  });
+});
+
+app.post('/api/admin/categories', (req, res, next) => {
+  const { key, name_en, name_ar } = req.body;
+  if (!key || !name_en || !name_ar) return res.status(400).json({ error: 'Missing required fields' });
+  db.run('INSERT INTO categories (key, name_en, name_ar) VALUES (?, ?, ?)', [key, name_en, name_ar], function(err) {
+    if (err) return next(err);
+    res.status(201).json({ success: true, id: this.lastID });
+  });
+});
+
+app.put('/api/admin/categories/:id', (req, res, next) => {
+  const { id } = req.params;
+  const { key, name_en, name_ar } = req.body;
+  db.run('UPDATE categories SET key = ?, name_en = ?, name_ar = ? WHERE id = ?', [key, name_en, name_ar, id], function(err) {
+    if (err) return next(err);
+    res.json({ success: true });
+  });
+});
+
+app.delete('/api/admin/categories/:id', (req, res, next) => {
+  const { id } = req.params;
+  db.run('DELETE FROM categories WHERE id = ?', [id], function(err) {
+    if (err) return next(err);
+    res.json({ success: true });
+  });
+});
+
+// --- Products Endpoints ---
+app.get('/api/products', (req, res, next) => {
+  db.all('SELECT * FROM products', [], (err, rows) => {
+    if (err) return next(err);
+    const parsed = rows.map(r => ({
+      ...r,
+      price: JSON.parse(r.price || 'null'),
+      sauces: r.sauces ? JSON.parse(r.sauces) : [],
+      ingredients: r.ingredients ? JSON.parse(r.ingredients) : []
+    }));
+    res.json(parsed);
+  });
+});
+
+app.post('/api/admin/products', (req, res, next) => {
+  const p = req.body;
+  db.run(`INSERT INTO products (category_key, key, name_en, name_ar, desc_en, desc_ar, price, img, weight, sauces, ingredients, is_popular) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0], 
+    function(err) {
+      if (err) return next(err);
+      res.status(201).json({ success: true, id: this.lastID });
+  });
+});
+
+app.put('/api/admin/products/:id', (req, res, next) => {
+  const { id } = req.params;
+  const p = req.body;
+  db.run(`UPDATE products SET category_key = ?, key = ?, name_en = ?, name_ar = ?, desc_en = ?, desc_ar = ?, price = ?, img = ?, weight = ?, sauces = ?, ingredients = ?, is_popular = ? WHERE id = ?`, 
+    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0, id], 
+    function(err) {
+      if (err) return next(err);
+      res.json({ success: true });
+  });
+});
+
+app.delete('/api/admin/products/:id', (req, res, next) => {
+  const { id } = req.params;
+  db.run('DELETE FROM products WHERE id = ?', [id], function(err) {
+    if (err) return next(err);
+    res.json({ success: true });
+  });
 });
 
 // Admin Login

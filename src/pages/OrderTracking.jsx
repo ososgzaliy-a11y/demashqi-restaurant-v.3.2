@@ -54,8 +54,8 @@ export default function OrderTracking() {
     switch (status) {
       case 'pending': return 1;
       case 'preparing': return 2;
-      case 'out_for_delivery': return 3;
-      case 'delivered': return 4;
+      case 'on_the_way': return 3;
+      case 'completed': return 4;
       default: return 0;
     }
   };

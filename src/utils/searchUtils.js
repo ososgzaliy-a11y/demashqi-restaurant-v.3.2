@@ -49,10 +49,11 @@ export const searchMenuItems = (searchQuery, allItemsFlattened) => {
     ...item,
     searchName: normalizeText(item.name),
     searchDesc: normalizeText(item.desc),
+    searchIngredients: normalizeText(item.ingredients ? JSON.stringify(item.ingredients) : ''),
   }));
 
   const fuse = new Fuse(searchableData, {
-    keys: ['searchName', 'searchDesc'],
+    keys: ['searchName', 'searchDesc', 'searchIngredients'],
     threshold: 0.4, // User requested 0.4 threshold
     ignoreLocation: true,
     distance: 100
@@ -70,6 +71,13 @@ export const searchMenuItems = (searchQuery, allItemsFlattened) => {
         allResults.push(res.item);
       }
     });
+  });
+
+  // Sort by popularity (is_popular: 1 first)
+  allResults.sort((a, b) => {
+    const popA = a.is_popular ? 1 : 0;
+    const popB = b.is_popular ? 1 : 0;
+    return popB - popA;
   });
 
   return allResults;

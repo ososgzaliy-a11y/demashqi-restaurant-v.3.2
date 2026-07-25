@@ -64,11 +64,18 @@ const filterBtnStyle = (active) => ({
   color: active ? '#fff' : 'var(--text-secondary)',
 });
 
+import { useLanguage } from '../context/LanguageContext';
+import AdminCategories from '../components/AdminCategories';
+import AdminProducts from '../components/AdminProducts';
+
 export default function Admin() {
+  const { language, t } = useLanguage();
+  const isRTL = language === 'ar';
+  
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState('orders');
-  const [data, setData] = useState({ orders: [], reservations: [], contacts: [] });
+  const [data, setData] = useState({ orders: [], reservations: [], contacts: [], categories: [], products: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [orderFilter, setOrderFilter] = useState('all');
@@ -106,15 +113,19 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ordersRes, resvRes, contactsRes] = await Promise.all([
+      const [ordersRes, resvRes, contactsRes, categoriesRes, productsRes] = await Promise.all([
         fetch(`${API}/api/admin/orders`),
         fetch(`${API}/api/admin/reservations`),
-        fetch(`${API}/api/admin/contacts`)
+        fetch(`${API}/api/admin/contacts`),
+        fetch(`${API}/api/categories`),
+        fetch(`${API}/api/products`)
       ]);
       const orders = ordersRes.ok ? await ordersRes.json() : [];
       const reservations = resvRes.ok ? await resvRes.json() : [];
       const contacts = contactsRes.ok ? await contactsRes.json() : [];
-      setData({ orders, reservations, contacts });
+      const categories = categoriesRes.ok ? await categoriesRes.json() : [];
+      const products = productsRes.ok ? await productsRes.json() : [];
+      setData({ orders, reservations, contacts, categories, products });
     } catch (err) {
       console.error('Error fetching admin data', err);
     } finally {
@@ -212,7 +223,7 @@ export default function Admin() {
 
   // ── Dashboard ─────────────────────────────────────────────
   return (
-    <div className="fade-in">
+    <div className="fade-in" dir={isRTL ? 'rtl' : 'ltr'}>
       <Toast message={toast.message} visible={toast.visible} />
 
       <header className="page-header" style={{ padding: '6rem 0 2rem' }}>
@@ -231,9 +242,11 @@ export default function Admin() {
         {/* ── Navigation Tabs ────────────────────────────────── */}
         <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', overflowX: 'auto' }}>
           {[
-            { key: 'orders', icon: <ShoppingBag size={20} />, label: 'Orders', count: data.orders.length },
-            { key: 'reservations', icon: <Calendar size={20} />, label: 'Reservations', count: data.reservations.length },
-            { key: 'contacts', icon: <MessageSquare size={20} />, label: 'Messages', count: data.contacts.length },
+            { key: 'orders', icon: <ShoppingBag size={20} />, label: isRTL ? 'الطلبات' : 'Orders', count: data.orders.length },
+            { key: 'reservations', icon: <Calendar size={20} />, label: isRTL ? 'الحجوزات' : 'Reservations', count: data.reservations.length },
+            { key: 'contacts', icon: <MessageSquare size={20} />, label: isRTL ? 'الرسائل' : 'Messages', count: data.contacts.length },
+            { key: 'categories', icon: <Filter size={20} />, label: isRTL ? 'الأقسام' : 'Categories', count: data.categories.length },
+            { key: 'products', icon: <ShoppingBag size={20} />, label: isRTL ? 'المنتجات' : 'Products', count: data.products.length },
           ].map(tab => (
             <button
               key={tab.key}
@@ -304,6 +317,12 @@ export default function Admin() {
                       <div>
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer & Address</h4>
                         <p style={{ margin: 0, fontWeight: '600', lineHeight: '1.6' }}>{order.address}</p>
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>📞 {order.phone || '—'}</p>
+                        {order.notes && (
+                          <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                            <strong style={{ color: 'var(--gold)' }}>Notes:</strong> {order.notes}
+                          </div>
+                        )}
                         <div style={{ marginTop: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', backgroundColor: 'rgba(229,185,66,0.1)', color: 'var(--gold)' }}>
                           💳 {order.paymentMethod === 'vodafone_cash' ? 'Vodafone Cash' : 'Cash on Delivery'}
                         </div>
@@ -430,6 +449,20 @@ export default function Admin() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            TAB 4: CATEGORIES MANAGEMENT
+            ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'categories' && (
+          <AdminCategories categories={data.categories} fetchData={fetchData} API={API} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            TAB 5: PRODUCTS MANAGEMENT
+            ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'products' && (
+          <AdminProducts products={data.products} categories={data.categories} fetchData={fetchData} API={API} />
         )}
       </section>
     </div>

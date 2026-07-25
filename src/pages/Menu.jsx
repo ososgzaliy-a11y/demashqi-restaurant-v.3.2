@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { searchMenuItems } from '../utils/searchUtils';
+import OffersSlider from '../components/OffersSlider';
 
 const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
 
@@ -16,66 +17,49 @@ export default function Menu() {
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [searchQuery, setSearchQuery] = useState('');
 
-  const items = t('menu.items');
-  const catT = t('menu.categories');
+  const [categoriesData, setCategoriesData] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const exactImageMap = {
-    'sh_sand_chicken': '7.png',
-    'sh_sand_meat': '26.png',
-    'pz_margherita': '5.png',
-    'app_fatteh': '8.png',
-    'br_4': '11.png',
-    'dr_cocktail': '14.png',
-    'dr_latte': '15.png',
-    'cr_nutella': '17.png'
-  };
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const [catRes, prodRes] = await Promise.all([
+          fetch(`http://${window.location.hostname}:3000/api/categories`),
+          fetch(`http://${window.location.hostname}:3000/api/products`)
+        ]);
+        const dbCats = await catRes.json();
+        const dbProds = await prodRes.json();
 
-  const getImageForKey = (key) => {
-    if (exactImageMap[key]) {
-      return `${import.meta.env.BASE_URL}Images/${exactImageMap[key]}`;
-    }
-    return null;
-  };
+        setProducts(dbProds);
 
-  // Build categories dynamically from the translations object
-  const categoriesData = [
-    {
-      key: 'shawarma',
-      title: catT.shawarma,
-      items: Object.keys(items).filter(k => k.startsWith('sh_') || k.startsWith('west_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/26.png`
-    },
-    {
-      key: 'broasted',
-      title: catT.broasted,
-      items: Object.keys(items).filter(k => k.startsWith('br_') || k.startsWith('meal_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/11.png`
-    },
-    {
-      key: 'pizza',
-      title: catT.pizza,
-      items: Object.keys(items).filter(k => k.startsWith('pz_') || k.startsWith('man_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/5.png`
-    },
-    {
-      key: 'crepes',
-      title: catT.crepes,
-      items: Object.keys(items).filter(k => k.startsWith('cr_') || k.startsWith('maria_') || k.startsWith('sham_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/17.png`
-    },
-    {
-      key: 'appetizers',
-      title: catT.appetizers,
-      items: Object.keys(items).filter(k => k.startsWith('tray_') || k.startsWith('app_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/8.png`
-    },
-    {
-      key: 'drinks',
-      title: catT.drinks,
-      items: Object.keys(items).filter(k => k.startsWith('dr_') || k.startsWith('ds_')).map(k => ({ ...items[k], id: k, img: getImageForKey(k) })),
-      img: `${import.meta.env.BASE_URL}Images/14.png`
-    }
-  ];
+        // Group products by category
+        const builtCats = dbCats.map(cat => {
+          const catItems = dbProds.filter(p => p.category_key === cat.key).map(p => ({
+            ...p,
+            id: p.id,
+            name: language === 'ar' ? p.name_ar : p.name_en,
+            desc: language === 'ar' ? p.desc_ar : p.desc_en,
+            img: p.img || getImageForKey(p.key)
+          }));
+          return {
+            key: cat.key,
+            title: language === 'ar' ? cat.name_ar : cat.name_en,
+            items: catItems,
+            img: getImageForKey(catItems[0]?.key) || `${import.meta.env.BASE_URL}Images/26.png`
+          };
+        });
+
+        // Add 'all' category conceptually handled by activeCategoryKey logic
+        setCategoriesData(builtCats);
+      } catch (err) {
+        console.error('Error fetching menu', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenu();
+  }, [language]);
 
   const handleOpenModal = (item) => {
     setSelectedItem(item);
@@ -149,12 +133,25 @@ export default function Menu() {
               backgroundColor: 'var(--card-bg)',
               color: 'var(--text-primary)',
               outline: 'none',
-              transition: 'border-color 0.3s ease'
+              transition: 'border-color 0.3s ease',
+              textAlign: language === 'ar' ? 'right' : 'left'
             }}
-            onFocus={(e) => e.currentTarget.style.borderColor = 'var(--gold)'}
-            onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--gold)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
           />
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gold)', fontSize: '1.2rem' }}>
+            {language === 'ar' ? 'جاري تحميل القائمة...' : 'Loading Menu...'}
+          </div>
+        )}
+
+        {/* Offers Slider (Only show when not searching and active category is all) */}
+        {!loading && !searchQuery && activeCategoryKey === 'all' && (
+          <OffersSlider products={products} />
+        )}
 
         {searchQuery ? (
           <div className="fade-in">
@@ -267,6 +264,37 @@ export default function Menu() {
 
             <h2 style={{ marginBottom: '0.5rem', color: 'var(--gold)', fontSize: '2rem' }}>{selectedItem.name}</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '1.1rem' }}>{selectedItem.desc}</p>
+
+            {/* Additional Info (Weight, Ingredients, Sauces) */}
+            {(selectedItem.weight || (selectedItem.ingredients && selectedItem.ingredients.length > 0) || (selectedItem.sauces && selectedItem.sauces.length > 0)) && (
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                {selectedItem.weight && (
+                  <p style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                    <strong style={{ color: 'var(--gold)' }}>{language === 'ar' ? 'الوزن/الحجم:' : 'Weight/Size:'}</strong> {selectedItem.weight}
+                  </p>
+                )}
+                {selectedItem.ingredients && selectedItem.ingredients.length > 0 && (
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>{language === 'ar' ? 'المكونات:' : 'Ingredients:'}</strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {selectedItem.ingredients.map((ing, idx) => (
+                        <span key={idx} style={{ padding: '4px 10px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '20px', fontSize: '0.85rem' }}>{ing}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedItem.sauces && selectedItem.sauces.length > 0 && (
+                  <div>
+                    <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>{language === 'ar' ? 'الصوصات المتوفرة:' : 'Included Sauces:'}</strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {selectedItem.sauces.map((sauce, idx) => (
+                        <span key={idx} style={{ padding: '4px 10px', backgroundColor: 'rgba(229,185,66,0.1)', color: 'var(--gold)', borderRadius: '20px', fontSize: '0.85rem' }}>{sauce}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Size Selector */}
             {typeof selectedItem.price === 'object' && (

@@ -181,12 +181,64 @@ const Footer = () => {
   );
 };
 
+const FloatingCart = () => {
+  const { cart } = useCart();
+  const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const location = useLocation();
+
+  // Show only on menu page when cart is not empty
+  if (cartItemCount === 0 || location.pathname !== '/menu') return null;
+
+  return (
+    <Link to="/checkout" className="scale-in" style={{
+      position: 'fixed',
+      bottom: '30px',
+      right: '30px',
+      backgroundColor: 'var(--brand-red)',
+      color: '#fff',
+      width: '60px',
+      height: '60px',
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 4px 15px rgba(200,16,46,0.4)',
+      zIndex: 1000,
+      textDecoration: 'none',
+      transition: 'transform 0.3s ease'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+    >
+      <ShoppingCart size={28} />
+      <span style={{
+        position: 'absolute',
+        top: '-5px',
+        right: '-5px',
+        backgroundColor: 'var(--gold)',
+        color: 'var(--bg-color)',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 'bold',
+        fontSize: '0.85rem'
+      }}>
+        {cartItemCount}
+      </span>
+    </Link>
+  );
+};
+
 export default function Layout({ children }) {
   return (
     <>
       <Navbar />
       <main>{children}</main>
       <Footer />
+      <FloatingCart />
     </>
   );
 }

@@ -13,8 +13,8 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, messa
         <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '1rem' }}>{title}</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem', lineHeight: 1.5 }}>{message}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <button onClick={onConfirm} disabled={countdown > 0} className="btn-primary" style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', opacity: countdown > 0 ? 0.6 : 1, cursor: countdown > 0 ? 'not-allowed' : 'pointer' }}>
-            {countdown > 0 ? `${confirmText} (${countdown})` : confirmText}
+          <button onClick={onConfirm} className="btn-primary" style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer' }}>
+            {confirmText} ({countdown})
           </button>
           <button onClick={onClose} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer' }}>
             {cancelText}
@@ -31,8 +31,13 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
   useEffect(() => {
     let timer;
-    if (showConfirmModal && confirmCountdown > 0) {
-      timer = setTimeout(() => setConfirmCountdown(prev => prev - 1), 1000);
+    if (showConfirmModal) {
+      if (confirmCountdown > 0) {
+        timer = setTimeout(() => setConfirmCountdown(prev => prev - 1), 1000);
+      } else {
+        // Auto cancel when time runs out
+        setShowConfirmModal(false);
+      }
     }
     return () => clearTimeout(timer);
   }, [showConfirmModal, confirmCountdown]);
@@ -51,6 +56,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     streetPH: language === 'ar' ? 'مثال: شارع السد' : 'e.g. Al Sadd St',
     building: language === 'ar' ? 'المبنى' : 'Building',
     floor: language === 'ar' ? 'الطابق / الشقة' : 'Floor / Apt',
+    notes: language === 'ar' ? 'ملاحظات إضافية' : 'Additional Notes',
     paymentTitle: language === 'ar' ? 'طريقة الدفع' : 'Payment Method',
     vodafoneCash: language === 'ar' ? 'فودافون كاش' : 'Vodafone Cash',
     anyCash: language === 'ar' ? 'الدفع نقداً' : 'Any Cash',
@@ -95,6 +101,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           total: cartTotal,
           address: addressStr,
           phone: formData.phone,
+          notes: formData.notes,
           paymentMethod: formData.paymentMethod
         })
       });
@@ -186,6 +193,12 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
               <input type="text" id="floor" name="floor" value={formData.floor || ''} onChange={handleChange} placeholder={language === 'ar' ? '(اختياري)' : '(optional)'} style={inputStyle} />
             </div>
           </div>
+
+          {/* Notes */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label htmlFor="notes" style={labelStyle}>{t.notes}</label>
+            <textarea id="notes" name="notes" value={formData.notes || ''} onChange={handleChange} placeholder={language === 'ar' ? 'أي ملاحظات إضافية للتوصيل أو الطلب...' : 'Any additional notes for delivery or order...'} style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} />
+          </div>
         </div>
       </div>
 
@@ -247,8 +260,8 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
         onConfirm={proceedCheckout}
         countdown={confirmCountdown}
         title={language === 'ar' ? 'تأكيد الطلب' : 'Confirm Order'}
-        message={language === 'ar' ? 'يرجى مراجعة طلبك قبل التأكيد النهائي. هل أنت متأكد من إتمام الطلب؟' : 'Please review your order before final confirmation. Are you sure you want to proceed?'}
-        confirmText={language === 'ar' ? 'تأكيد الآن' : 'Confirm Now'}
+        message={language === 'ar' ? 'يرجى مراجعة طلبك وتأكيده قبل انتهاء الوقت. لن يتم اعتماد الطلب بدون تأكيدك.' : 'Please review and confirm your order before time runs out. The order will not be placed without your confirmation.'}
+        confirmText={language === 'ar' ? 'اضغط للتأكيد' : 'Click to Confirm'}
         cancelText={language === 'ar' ? 'إلغاء' : 'Cancel'}
       />
     </form>
@@ -266,6 +279,7 @@ export default function Checkout() {
     street: '',
     building: '',
     floor: '',
+    notes: '',
     paymentMethod: 'vodafone_cash'
   });
   const [status, setStatus] = useState({ type: '', message: '' });
