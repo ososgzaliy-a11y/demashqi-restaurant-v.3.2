@@ -5,6 +5,7 @@ import { PlusCircle, Pencil, Trash2, X, Plus, Minus } from 'lucide-react';
 const EMPTY = {
   id: null, category_key: '', key: '', name_en: '', name_ar: '',
   desc_en: '', desc_ar: '', img: '', weight: '', is_popular: 0,
+  offer_type: 'none',
   sauces: [], ingredients: [],
   // price mode: 'single' | 'multi'
   priceMode: 'single',
@@ -25,6 +26,17 @@ export default function AdminProducts({ products, categories, fetchData, API }) 
     border: '1px solid var(--border-color)',
     backgroundColor: 'var(--bg-color)', color: '#fff',
     width: '100%', fontSize: '0.9rem', outline: 'none',
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, img: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // --- Size helpers ---
@@ -74,6 +86,7 @@ export default function AdminProducts({ products, categories, fetchData, API }) 
         img: formData.img,
         weight: formData.weight,
         is_popular: formData.is_popular,
+        offer_type: formData.offer_type || 'none',
         sauces: formData.sauces.filter(s => s.trim()),
         ingredients: formData.ingredients.filter(i => i.trim()),
         price: buildPrice(),
@@ -116,6 +129,7 @@ export default function AdminProducts({ products, categories, fetchData, API }) 
       img: prod.img || '',
       weight: prod.weight || '',
       is_popular: prod.is_popular || 0,
+      offer_type: prod.offer_type || 'none',
       sauces: Array.isArray(prod.sauces) ? prod.sauces : [],
       ingredients: Array.isArray(prod.ingredients) ? prod.ingredients : [],
       priceMode: isMulti ? 'multi' : 'single',
@@ -184,9 +198,18 @@ export default function AdminProducts({ products, categories, fetchData, API }) 
             </div>
 
             {/* Image */}
-            <div>
-              <label style={sectionLabel}>{lbl('Image URL', 'رابط الصورة')}</label>
-              <input type="text" value={formData.img} onChange={e => setFormData({ ...formData, img: e.target.value })} style={inputStyle} placeholder="https://..." />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={sectionLabel}>{lbl('Image (Upload or URL)', 'رابط أو رفع الصورة')}</label>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input type="text" value={formData.img} onChange={e => setFormData({ ...formData, img: e.target.value })} style={{ ...inputStyle, flex: 1 }} placeholder="https://..." />
+                <label style={{ cursor: 'pointer', padding: '0.8rem 1rem', backgroundColor: 'var(--gold)', color: '#000', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0, textAlign: 'center' }}>
+                  {lbl('Browse', 'تصفح')}
+                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+              {formData.img && formData.img.startsWith('data:image') && (
+                <img src={formData.img} alt="Preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', marginTop: '0.5rem' }} />
+              )}
             </div>
 
             {/* Weight */}
@@ -195,12 +218,21 @@ export default function AdminProducts({ products, categories, fetchData, API }) 
               <input type="text" value={formData.weight} onChange={e => setFormData({ ...formData, weight: e.target.value })} style={inputStyle} placeholder="500g" />
             </div>
 
-            {/* Popular */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem 1rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <input type="checkbox" id="is_popular" checked={formData.is_popular === 1} onChange={e => setFormData({ ...formData, is_popular: e.target.checked ? 1 : 0 })} style={{ accentColor: 'var(--gold)', transform: 'scale(1.3)' }} />
-              <label htmlFor="is_popular" style={{ cursor: 'pointer', fontWeight: '600' }}>
-                ⭐ {lbl('Is Popular?', 'منتج مميز؟')}
-              </label>
+            {/* Popular & Offer Type */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', gridColumn: '1 / -1' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem 1rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <input type="checkbox" id="is_popular" checked={formData.is_popular === 1} onChange={e => setFormData({ ...formData, is_popular: e.target.checked ? 1 : 0 })} style={{ accentColor: 'var(--gold)', transform: 'scale(1.3)' }} />
+                <label htmlFor="is_popular" style={{ cursor: 'pointer', fontWeight: '600' }}>
+                  ⭐ {lbl('Is Popular?', 'منتج مميز؟')}
+                </label>
+              </div>
+              <div>
+                <select value={formData.offer_type} onChange={e => setFormData({ ...formData, offer_type: e.target.value })} style={inputStyle}>
+                  <option value="none">{lbl('No Offer', 'بدون عرض')}</option>
+                  <option value="daily">{lbl("Today's Offer", 'عرض اليوم')}</option>
+                  <option value="weekly">{lbl("Weekly Offer", 'عرض الأسبوع')}</option>
+                </select>
+              </div>
             </div>
           </div>
 

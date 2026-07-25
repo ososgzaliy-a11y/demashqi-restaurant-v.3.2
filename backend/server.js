@@ -17,7 +17,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Rate limiting: max 100 requests per 15 minutes per IP
 const apiLimiter = rateLimit({
@@ -173,8 +173,9 @@ app.post('/api/admin/categories', (req, res, next) => {
 
 app.put('/api/admin/categories/:id', (req, res, next) => {
   const { id } = req.params;
-  const { key, name_en, name_ar } = req.body;
-  db.run('UPDATE categories SET key = ?, name_en = ?, name_ar = ? WHERE id = ?', [key, name_en, name_ar, id], function(err) {
+  const { key, name_en, name_ar, img, desc_en, desc_ar } = req.body;
+  db.run('UPDATE categories SET key = ?, name_en = ?, name_ar = ?, img = ?, desc_en = ?, desc_ar = ? WHERE id = ?', 
+    [key, name_en, name_ar, img, desc_en, desc_ar, id], function(err) {
     if (err) return next(err);
     res.json({ success: true });
   });
@@ -204,9 +205,9 @@ app.get('/api/products', (req, res, next) => {
 
 app.post('/api/admin/products', (req, res, next) => {
   const p = req.body;
-  db.run(`INSERT INTO products (category_key, key, name_en, name_ar, desc_en, desc_ar, price, img, weight, sauces, ingredients, is_popular) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0], 
+  db.run(`INSERT INTO products (category_key, key, name_en, name_ar, desc_en, desc_ar, price, img, weight, sauces, ingredients, is_popular, offer_type) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0, p.offer_type || 'none'], 
     function(err) {
       if (err) return next(err);
       res.status(201).json({ success: true, id: this.lastID });
@@ -216,8 +217,8 @@ app.post('/api/admin/products', (req, res, next) => {
 app.put('/api/admin/products/:id', (req, res, next) => {
   const { id } = req.params;
   const p = req.body;
-  db.run(`UPDATE products SET category_key = ?, key = ?, name_en = ?, name_ar = ?, desc_en = ?, desc_ar = ?, price = ?, img = ?, weight = ?, sauces = ?, ingredients = ?, is_popular = ? WHERE id = ?`, 
-    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0, id], 
+  db.run(`UPDATE products SET category_key = ?, key = ?, name_en = ?, name_ar = ?, desc_en = ?, desc_ar = ?, price = ?, img = ?, weight = ?, sauces = ?, ingredients = ?, is_popular = ?, offer_type = ? WHERE id = ?`, 
+    [p.category_key, p.key, p.name_en, p.name_ar, p.desc_en, p.desc_ar, JSON.stringify(p.price), p.img, p.weight, JSON.stringify(p.sauces || []), JSON.stringify(p.ingredients || []), p.is_popular || 0, p.offer_type || 'none', id], 
     function(err) {
       if (err) return next(err);
       res.json({ success: true });

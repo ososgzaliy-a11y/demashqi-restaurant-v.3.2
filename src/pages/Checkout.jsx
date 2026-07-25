@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle } from 'lucide-react';
+import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X } from 'lucide-react';
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
   if (!isOpen) return null;
@@ -268,7 +268,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
   );
 }
 
-export default function Checkout() {
+export default function Checkout({ isModal = false, onClose }) {
   const { cart, cartTotal, clearCart } = useCart();
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -284,27 +284,37 @@ export default function Checkout() {
   });
   const [status, setStatus] = useState({ type: '', message: '' });
 
-  if (cart.length === 0 && status.type !== 'success') {
-    return (
-      <div className="container" style={{ padding: '8rem 0', textAlign: 'center', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <ShoppingBag size={80} color="var(--text-secondary)" style={{ opacity: 0.5, marginBottom: '2rem' }} />
-        <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
-          {language === 'ar' ? 'سلة الطلبات فارغة' : 'Your Cart is Empty'}
-        </h2>
-        <p style={{ marginBottom: '2.5rem', color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
-          {language === 'ar' ? 'لم تضف أي عناصر إلى طلبك بعد.' : "Looks like you haven't added anything to your order yet."}
-        </p>
-        <button onClick={() => navigate('/menu')} className="btn-primary" style={{ padding: '1rem 3rem', borderRadius: '50px' }}>
-          {language === 'ar' ? 'استكشف القائمة' : 'Explore Menu'}
-        </button>
-      </div>
-    );
-  }
+  const EmptyCartView = () => (
+    <div className="container" style={{ padding: '8rem 0', textAlign: 'center', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <ShoppingBag size={80} color="var(--text-secondary)" style={{ opacity: 0.5, marginBottom: '2rem' }} />
+      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+        {language === 'ar' ? 'سلة الطلبات فارغة' : 'Your Cart is Empty'}
+      </h2>
+      <p style={{ marginBottom: '2.5rem', color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
+        {language === 'ar' ? 'لم تضف أي عناصر إلى طلبك بعد.' : "Looks like you haven't added anything to your order yet."}
+      </p>
+      <button onClick={() => { if (isModal && onClose) onClose(); else navigate('/menu'); }} className="btn-primary" style={{ padding: '1rem 3rem', borderRadius: '50px' }}>
+        {language === 'ar' ? 'استكشف القائمة' : 'Explore Menu'}
+      </button>
+    </div>
+  );
 
-  return (
+  const CheckoutContent = (
     <div className="fade-in">
-      <header className="page-header" style={{ padding: '8rem 0 3rem' }}>
-        <div className="container">
+      {/* Header */}
+      <div style={{ backgroundColor: 'var(--card-bg)', padding: isModal ? '2rem 0' : '8rem 0 3rem', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+        {isModal && onClose && (
+          <button onClick={onClose} style={{
+            position: 'absolute', top: '1rem', right: '2rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', color: 'var(--brand-red)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
+            transition: 'transform 0.2s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <X size={20} />
+          </button>
+        )}
+        <div className="container" style={{ textAlign: 'center' }}>
           <h1 style={{ fontSize: 'clamp(2rem, 6vw, 3.5rem)', marginBottom: '1rem' }}>
             {language === 'ar' ? 'الدفع الآمن' : 'Secure Checkout'}
           </h1>
@@ -312,9 +322,16 @@ export default function Checkout() {
             {language === 'ar' ? 'أكمل طلب التوصيل الخاص بك.' : 'Complete your delivery order.'}
           </p>
         </div>
-      </header>
+      </div>
+      {isModal && onClose && (
+        <div style={{ textAlign: 'center', padding: '0.6rem 0 0.2rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '0.95rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+            ← {language === 'ar' ? 'رجوع لإكمال التسوق' : 'Back to Shopping'}
+          </button>
+        </div>
+      )}
 
-      <section className="section container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '3rem' }}>
+      <section className="section container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '3rem', padding: '3rem 0' }}>
 
         {/* Order Summary */}
         <div>
@@ -360,4 +377,24 @@ export default function Checkout() {
       </section>
     </div>
   );
+
+  if (isModal) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        backgroundColor: 'var(--bg-color)', overflowY: 'auto',
+        animation: 'slideUpFull 0.35s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+        {cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent}
+        <style>{`
+          @keyframes slideUpFull {
+            from { transform: translateY(100%); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  return cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent;
 }

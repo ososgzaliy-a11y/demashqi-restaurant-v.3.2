@@ -6,6 +6,10 @@ export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  const openCheckout = () => setIsCheckoutOpen(true);
+  const closeCheckout = () => setIsCheckoutOpen(false);
 
   const addToCart = (item, quantity) => {
     setCart(prev => {
@@ -35,7 +39,7 @@ export const CartProvider = ({ children }) => {
   }, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, cartTotal }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, cartTotal, isCheckoutOpen, openCheckout, closeCheckout }}>
       {children}
     </CartContext.Provider>
   );

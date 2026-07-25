@@ -15,7 +15,6 @@ import Testimonials from './pages/Testimonials';
 
 import { CartProvider } from './context/CartContext';
 import { LanguageProvider } from './context/LanguageContext';
-import Checkout from './pages/Checkout';
 import Admin from './pages/Admin';
 import OrderTracking from './pages/OrderTracking';
 import { useEffect } from 'react';
@@ -49,7 +48,6 @@ function App() {
               <Route path="/chef" element={<Chef />} />
               <Route path="/events" element={<Events />} />
               <Route path="/testimonials" element={<Testimonials />} />
-              <Route path="/checkout" element={<Checkout />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/track" element={<OrderTracking />} />
             </Routes>

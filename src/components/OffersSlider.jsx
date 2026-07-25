@@ -28,21 +28,32 @@ export default function OffersSlider({ products, onItemClick }) {
     setActiveIndex(prev => (prev - 1 + offerItems.length) % offerItems.length);
   }, [offerItems.length]);
 
-  // Auto-play with 2s spotlight per slide
+  // Auto-play with 2.5s spotlight per slide
   useEffect(() => {
     if (offerItems.length === 0 || isHovered) return;
     intervalRef.current = setInterval(goToNext, 2500);
     return () => clearInterval(intervalRef.current);
   }, [isHovered, goToNext, offerItems.length]);
 
-  // Scroll active card into view
+  // Sync scroll position when auto-playing
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isHovered) return;
     const cards = containerRef.current.querySelectorAll('.offer-card');
     if (cards[activeIndex]) {
       cards[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
-  }, [activeIndex]);
+  }, [activeIndex, isHovered]);
+
+  const handleScroll = (e) => {
+    if (!isHovered) return; // Only update activeIndex manually if user is interacting
+    const container = e.target;
+    const scrollLeft = container.scrollLeft;
+    const cardWidth = 260 + 24; // width + gap approx
+    let newIndex = Math.round(scrollLeft / cardWidth);
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= offerItems.length) newIndex = offerItems.length - 1;
+    setActiveIndex(newIndex);
+  };
 
   if (offerItems.length === 0) return null;
 
@@ -69,20 +80,23 @@ export default function OffersSlider({ products, onItemClick }) {
         onTouchStart={() => setIsHovered(true)}
         onTouchEnd={() => { setIsHovered(false); }}
       >
-        <div
-          ref={containerRef}
-          style={{
-            display: 'flex',
-            gap: '1.5rem',
-            overflowX: 'auto',
-            padding: '0.5rem 1rem 1.5rem 1rem',
-            scrollBehavior: 'smooth',
-            msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-          }}
-          className="hide-scrollbar"
-        >
-          {offerItems.map((item, index) => {
+          <div
+            ref={containerRef}
+            onScroll={handleScroll}
+            style={{
+              display: 'flex',
+              gap: '1.5rem',
+              overflowX: 'auto',
+              padding: '0.5rem 1rem 1.5rem 1rem',
+              scrollBehavior: 'smooth',
+              msOverflowStyle: 'none',
+              scrollbarWidth: 'none',
+              scrollSnapType: 'x mandatory',
+              WebkitOverflowScrolling: 'touch',
+            }}
+            className="hide-scrollbar"
+          >
+            {offerItems.map((item, index) => {
             const isActive = index === activeIndex;
             return (
               <div
@@ -108,6 +122,7 @@ export default function OffersSlider({ products, onItemClick }) {
                   cursor: 'pointer',
                   zIndex: isActive ? 2 : 1,
                   position: 'relative',
+                  scrollSnapAlign: 'center',
                 }}
               >
                 {/* Active spotlight glow overlay */}

@@ -4,11 +4,12 @@ import { ShoppingCart, Globe, Menu, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useLanguage } from '../context/LanguageContext';
 import LogoImg from '../../Images/2.png';
+import Checkout from '../pages/Checkout';
 
 const Navbar = () => {
   const location = useLocation();
   const path = location.pathname;
-  const { cart } = useCart();
+  const { cart, openCheckout } = useCart();
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const { t, language, toggleLanguage } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,26 +64,26 @@ const Navbar = () => {
             <span style={{ fontWeight: 'bold' }}>{language === 'en' ? 'عربي' : 'EN'}</span>
           </button>
 
-          <Link to="/checkout" className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative' }}>
+          <button onClick={openCheckout} className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             <ShoppingCart size={20} />
             {cartItemCount > 0 && (
               <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px' }}>
                 {cartItemCount}
               </span>
             )}
-          </Link>
+          </button>
         </div>
 
         {/* Mobile: cart + hamburger */}
         <div className="nav-mobile-controls" style={{ display: 'none', alignItems: 'center', gap: '1rem', zIndex: 1100 }}>
-          <Link to="/checkout" style={{ display: 'flex', alignItems: 'center', position: 'relative', color: 'var(--text-primary)' }}>
+          <button onClick={openCheckout} style={{ display: 'flex', alignItems: 'center', position: 'relative', color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             <ShoppingCart size={22} />
             {cartItemCount > 0 && (
               <span style={{ position: 'absolute', top: '-8px', right: '-10px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
                 {cartItemCount}
               </span>
             )}
-          </Link>
+          </button>
           <button
             onClick={() => setMenuOpen(prev => !prev)}
             aria-label="Toggle menu"
@@ -182,7 +183,8 @@ const Footer = () => {
 };
 
 const FloatingCart = () => {
-  const { cart } = useCart();
+  const { cart, openCheckout } = useCart();
+  const { language } = useLanguage();
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const location = useLocation();
 
@@ -190,55 +192,84 @@ const FloatingCart = () => {
   if (cartItemCount === 0 || location.pathname !== '/menu') return null;
 
   return (
-    <Link to="/checkout" className="scale-in" style={{
-      position: 'fixed',
-      bottom: '30px',
-      right: '30px',
-      backgroundColor: 'var(--brand-red)',
-      color: '#fff',
-      width: '60px',
-      height: '60px',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 4px 15px rgba(200,16,46,0.4)',
-      zIndex: 1000,
-      textDecoration: 'none',
-      transition: 'transform 0.3s ease'
-    }}
-    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-    >
-      <ShoppingCart size={28} />
-      <span style={{
-        position: 'absolute',
-        top: '-5px',
-        right: '-5px',
-        backgroundColor: 'var(--gold)',
-        color: 'var(--bg-color)',
-        width: '24px',
-        height: '24px',
+    <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+      {/* CTA Label */}
+      <div className="scale-in" style={{
+        backgroundColor: 'var(--card-bg)',
+        color: 'var(--gold)',
+        padding: '0.5rem 1rem',
+        borderRadius: '20px',
+        fontSize: '0.9rem',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        border: '1px solid var(--border-color)',
+        animation: 'bounce 2s infinite',
+      }}>
+        {language === 'ar' ? 'اضغط هنا للذهاب للـ Checkout' : 'Click here to Checkout'}
+      </div>
+      
+      {/* Floating Button */}
+      <button onClick={openCheckout} className="scale-in" style={{
+        backgroundColor: 'var(--brand-red)',
+        color: '#fff',
+        width: '64px',
+        height: '64px',
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontWeight: 'bold',
-        fontSize: '0.85rem'
-      }}>
-        {cartItemCount}
-      </span>
-    </Link>
+        boxShadow: '0 4px 15px rgba(200,16,46,0.4)',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'transform 0.3s ease',
+        alignSelf: 'flex-end'
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+      >
+        <ShoppingCart size={30} />
+        <span style={{
+          position: 'absolute',
+          top: '-2px',
+          right: '-2px',
+          backgroundColor: 'var(--gold)',
+          color: 'var(--bg-color)',
+          width: '26px',
+          height: '26px',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 'bold',
+          fontSize: '0.9rem'
+        }}>
+          {cartItemCount}
+        </span>
+      </button>
+
+      <style>{`
+        @keyframes bounce {
+          0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-10px); }
+          60% { transform: translateY(-5px); }
+        }
+      `}</style>
+    </div>
   );
 };
 
 export default function Layout({ children }) {
+  const { isCheckoutOpen, closeCheckout } = useCart();
   return (
     <>
       <Navbar />
       <main>{children}</main>
       <Footer />
       <FloatingCart />
+      {/* Checkout Modal Overlay */}
+      {isCheckoutOpen && (
+        <Checkout isModal={true} onClose={closeCheckout} />
+      )}
     </>
   );
 }

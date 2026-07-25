@@ -72,8 +72,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key TEXT UNIQUE NOT NULL,
         name_en TEXT NOT NULL,
-        name_ar TEXT NOT NULL
-      )`);
+        name_ar TEXT NOT NULL,
+        img TEXT,
+        desc_en TEXT,
+        desc_ar TEXT
+      )`, () => {
+        db.run(`ALTER TABLE categories ADD COLUMN img TEXT`, () => {});
+        db.run(`ALTER TABLE categories ADD COLUMN desc_en TEXT`, () => {});
+        db.run(`ALTER TABLE categories ADD COLUMN desc_ar TEXT`, () => {});
+      });
 
       db.run(`CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,8 +95,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
         weight TEXT,
         sauces TEXT,
         ingredients TEXT,
-        is_popular INTEGER DEFAULT 0
-      )`);
+        is_popular INTEGER DEFAULT 0,
+        offer_type TEXT DEFAULT 'none'
+      )`, () => {
+        // Safe migration to add offer_type if it doesn't exist
+        db.run(`ALTER TABLE products ADD COLUMN offer_type TEXT DEFAULT 'none';`, (err) => {
+          if (!err) console.log('Migrated products table: added offer_type');
+        });
+      });
     });
   }
 });

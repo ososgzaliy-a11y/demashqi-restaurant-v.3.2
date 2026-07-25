@@ -12,6 +12,17 @@ export default function AdminCategories({ categories, fetchData, API }) {
 
   const lbl = (en, ar) => (language === 'ar' ? ar : en);
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, img: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -84,9 +95,18 @@ export default function AdminCategories({ categories, fetchData, API }) {
 
           <div>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-              {lbl('Image URL (required)', 'رابط صورة القسم (مطلوب)')}
+              {lbl('Image (Upload or URL) *', 'رابط أو رفع صورة القسم *')}
             </label>
-            <input type="text" value={formData.img} onChange={e => setFormData({ ...formData, img: e.target.value })} style={inputStyle} placeholder="https://..." />
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input type="text" value={formData.img} onChange={e => setFormData({ ...formData, img: e.target.value })} style={{ ...inputStyle, flex: 1 }} placeholder="https://..." />
+              <label style={{ cursor: 'pointer', padding: '0.8rem 1rem', backgroundColor: 'var(--gold)', color: '#000', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0, textAlign: 'center' }}>
+                {lbl('Browse', 'تصفح')}
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {formData.img && formData.img.startsWith('data:image') && (
+              <img src={formData.img} alt="Preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', marginTop: '0.5rem' }} />
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
