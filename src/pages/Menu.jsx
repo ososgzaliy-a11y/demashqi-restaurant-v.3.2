@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { X } from 'lucide-react';
@@ -21,6 +21,16 @@ export default function Menu() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const exactImageMap = {
+    'sh_sand_chicken': '7.png', 'sh_sand_meat': '26.png',
+    'pz_margherita': '5.png', 'app_fatteh': '8.png',
+    'br_4': '11.png', 'dr_cocktail': '14.png',
+    'dr_latte': '15.png', 'cr_nutella': '17.png',
+  };
+  const getImageForKey = (key) => exactImageMap[key]
+    ? `${import.meta.env.BASE_URL}Images/${exactImageMap[key]}`
+    : null;
+
   useEffect(() => {
     const fetchMenu = async () => {
       try {
@@ -35,13 +45,24 @@ export default function Menu() {
 
         // Group products by category
         const builtCats = dbCats.map(cat => {
-          const catItems = dbProds.filter(p => p.category_key === cat.key).map(p => ({
-            ...p,
-            id: p.id,
-            name: language === 'ar' ? p.name_ar : p.name_en,
-            desc: language === 'ar' ? p.desc_ar : p.desc_en,
-            img: p.img || getImageForKey(p.key)
-          }));
+          const catItems = dbProds.filter(p => p.category_key === cat.key).map(p => {
+            // Normalise price: DB may return it as a string-encoded JSON
+            let price = p.price;
+            if (typeof price === 'string') {
+              try { price = JSON.parse(price); } catch { price = Number(price) || price; }
+            }
+            return {
+              ...p,
+              price,
+              id: p.id,
+              name: language === 'ar' ? p.name_ar : p.name_en,
+              desc: language === 'ar' ? p.desc_ar : p.desc_en,
+              img: p.img || getImageForKey(p.key),
+              // Also normalise arrays
+              sauces: Array.isArray(p.sauces) ? p.sauces : (typeof p.sauces === 'string' ? JSON.parse(p.sauces || '[]') : []),
+              ingredients: Array.isArray(p.ingredients) ? p.ingredients : (typeof p.ingredients === 'string' ? JSON.parse(p.ingredients || '[]') : []),
+            };
+          });
           return {
             key: cat.key,
             title: language === 'ar' ? cat.name_ar : cat.name_en,
@@ -61,11 +82,22 @@ export default function Menu() {
     fetchMenu();
   }, [language]);
 
+  const normalisePrice = (raw) => {
+    if (raw === null || raw === undefined) return 0;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return Number(raw) || raw; }
+    }
+    return raw;
+  };
+
   const handleOpenModal = (item) => {
-    setSelectedItem(item);
+    const price = normalisePrice(item.price);
+    const normItem = { ...item, price };
+    setSelectedItem(normItem);
     setQuantity(1);
-    if (typeof item.price === 'object') {
-      setSelectedSize(Object.keys(item.price)[0]);
+    if (typeof price === 'object' && price !== null) {
+      setSelectedSize(Object.keys(price)[0]);
     } else {
       setSelectedSize(null);
     }
@@ -75,18 +107,18 @@ export default function Menu() {
     if (selectedItem) {
       const priceToUse = selectedSize ? selectedItem.price[selectedSize] : selectedItem.price;
       const nameToUse = selectedSize ? `${selectedItem.name} (${selectedSize})` : selectedItem.name;
-
       addToCart({ ...selectedItem, name: nameToUse, price: priceToUse }, quantity);
       setSelectedItem(null);
     }
   };
 
-  const getDisplayPrice = (priceData) => {
-    if (typeof priceData === 'object') {
-      const minPrice = Math.min(...Object.values(priceData));
-      return language === 'ar' ? `تبدأ من ${minPrice} ج.م` : `From ${minPrice} EGP`;
+  const getDisplayPrice = (rawPrice) => {
+    const price = normalisePrice(rawPrice);
+    if (typeof price === 'object' && price !== null) {
+      const minPrice = Math.min(...Object.values(price));
+      return language === 'ar' ? `يبدأ من ${minPrice} ج.م` : `From ${minPrice} EGP`;
     }
-    return language === 'ar' ? `${priceData} ج.م` : `${priceData} EGP`;
+    return language === 'ar' ? `${price} ج.م` : `${price} EGP`;
   };
 
   const currentModalPrice = selectedItem
@@ -150,7 +182,7 @@ export default function Menu() {
 
         {/* Offers Slider (Only show when not searching and active category is all) */}
         {!loading && !searchQuery && activeCategoryKey === 'all' && (
-          <OffersSlider products={products} />
+          <OffersSlider products={products} onItemClick={handleOpenModal} />
         )}
 
         {searchQuery ? (

@@ -42,6 +42,15 @@ export default function OrderTracking() {
     }
   }, [orderIdParam]);
 
+  // Real-time polling every 8 seconds
+  useEffect(() => {
+    if (!orderIdParam) return;
+    const intervalId = setInterval(() => {
+      fetchOrderStatus(orderIdParam);
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, [orderIdParam]);
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (orderId) {

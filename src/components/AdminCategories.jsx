@@ -1,24 +1,31 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { PlusCircle, Pencil, Trash2, X } from 'lucide-react';
+
+const EMPTY = { id: null, key: '', name_en: '', name_ar: '', img: '', desc_en: '', desc_ar: '' };
 
 export default function AdminCategories({ categories, fetchData, API }) {
   const { language } = useLanguage();
   const isRTL = language === 'ar';
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ id: null, key: '', name_en: '', name_ar: '' });
+  const [formData, setFormData] = useState(EMPTY);
+
+  const lbl = (en, ar) => (language === 'ar' ? ar : en);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     const method = formData.id ? 'PUT' : 'POST';
-    const url = formData.id ? `${API}/api/admin/categories/${formData.id}` : `${API}/api/admin/categories`;
+    const url = formData.id
+      ? `${API}/api/admin/categories/${formData.id}`
+      : `${API}/api/admin/categories`;
     try {
       await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
-      setFormData({ id: null, key: '', name_en: '', name_ar: '' });
+      setFormData(EMPTY);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -28,7 +35,7 @@ export default function AdminCategories({ categories, fetchData, API }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
+    if (!window.confirm(lbl('Delete this category?', 'هل أنت متأكد من حذف هذا القسم؟'))) return;
     try {
       await fetch(`${API}/api/admin/categories/${id}`, { method: 'DELETE' });
       fetchData();
@@ -37,43 +44,118 @@ export default function AdminCategories({ categories, fetchData, API }) {
     }
   };
 
-  const inputStyle = { padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: '#fff', width: '100%' };
+  const inputStyle = {
+    padding: '0.8rem 1rem',
+    borderRadius: '8px',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--bg-color)',
+    color: '#fff',
+    width: '100%',
+    fontSize: '0.95rem',
+    outline: 'none',
+    direction: 'ltr',
+  };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-      <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.5rem', borderRadius: '12px' }}>
-        <h3>{formData.id ? 'Edit Category' : 'Add Category'}</h3>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-          <input type="text" placeholder="Key (e.g. shawarma)" value={formData.key} onChange={e => setFormData({ ...formData, key: e.target.value })} required style={inputStyle} />
-          <input type="text" placeholder="Name (EN)" value={formData.name_en} onChange={e => setFormData({ ...formData, name_en: e.target.value })} required style={inputStyle} />
-          <input type="text" placeholder="Name (AR)" value={formData.name_ar} onChange={e => setFormData({ ...formData, name_ar: e.target.value })} required style={inputStyle} />
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button type="submit" className="btn-primary" disabled={loading} style={{ flex: 1, padding: '0.8rem' }}>{loading ? 'Saving...' : 'Save'}</button>
-            {formData.id && <button type="button" onClick={() => setFormData({ id: null, key: '', name_en: '', name_ar: '' })} style={{ padding: '0.8rem', backgroundColor: 'transparent', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '8px' }}>Cancel</button>}
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,380px) 1fr', gap: '2rem', alignItems: 'start' }}>
+      {/* ── Form ── */}
+      <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.8rem', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+        <h3 style={{ marginBottom: '1.5rem', color: 'var(--gold)' }}>
+          {formData.id ? lbl('✏️ Edit Category', '✏️ تعديل القسم') : lbl('➕ Add Category', '➕ إضافة قسم')}
+        </h3>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+              {lbl('Key (slug, e.g. shawarma)', 'المفتاح الداخلي (slug)')}
+            </label>
+            <input type="text" value={formData.key} onChange={e => setFormData({ ...formData, key: e.target.value })} required style={inputStyle} placeholder="shawarma" />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Name EN</label>
+              <input type="text" value={formData.name_en} onChange={e => setFormData({ ...formData, name_en: e.target.value })} required style={inputStyle} placeholder="Shawarma" />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>الاسم بالعربي</label>
+              <input type="text" value={formData.name_ar} onChange={e => setFormData({ ...formData, name_ar: e.target.value })} required style={{ ...inputStyle, direction: 'rtl' }} placeholder="شاورما" />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+              {lbl('Image URL (required)', 'رابط صورة القسم (مطلوب)')}
+            </label>
+            <input type="text" value={formData.img} onChange={e => setFormData({ ...formData, img: e.target.value })} style={inputStyle} placeholder="https://..." />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Desc EN (optional)</label>
+              <input type="text" value={formData.desc_en} onChange={e => setFormData({ ...formData, desc_en: e.target.value })} style={inputStyle} placeholder="Grilled wraps..." />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>الوصف بالعربي (اختياري)</label>
+              <input type="text" value={formData.desc_ar} onChange={e => setFormData({ ...formData, desc_ar: e.target.value })} style={{ ...inputStyle, direction: 'rtl' }} placeholder="شاورما مشوية..." />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.5rem' }}>
+            <button type="submit" className="btn-primary" disabled={loading} style={{ flex: 1, padding: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <PlusCircle size={18} />
+              {loading ? lbl('Saving...', 'جاري الحفظ...') : lbl('Save', 'حفظ')}
+            </button>
+            {formData.id && (
+              <button type="button" onClick={() => setFormData(EMPTY)} style={{ padding: '0.9rem 1.2rem', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            )}
           </div>
         </form>
       </div>
 
-      <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.5rem', borderRadius: '12px' }}>
-        <h3>Category List</h3>
-        <table style={{ width: '100%', textAlign: isRTL ? 'right' : 'left', marginTop: '1rem', borderCollapse: 'collapse' }}>
+      {/* ── Table ── */}
+      <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.8rem', borderRadius: '14px', border: '1px solid var(--border-color)', overflowX: 'auto' }}>
+        <h3 style={{ marginBottom: '1.5rem', color: 'var(--gold)' }}>
+          {lbl('📋 Category List', '📋 قائمة الأقسام')}
+        </h3>
+        <table style={{ width: '100%', textAlign: isRTL ? 'right' : 'left', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-              <th style={{ padding: '1rem' }}>Key</th>
-              <th style={{ padding: '1rem' }}>Name (EN)</th>
-              <th style={{ padding: '1rem' }}>Name (AR)</th>
-              <th style={{ padding: '1rem' }}>Actions</th>
+            <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+              <th style={{ padding: '0.8rem 1rem', color: 'var(--text-secondary)', fontWeight: '600' }}>{lbl('Key', 'المفتاح')}</th>
+              <th style={{ padding: '0.8rem 1rem', color: 'var(--text-secondary)', fontWeight: '600' }}>{lbl('Name', 'الاسم')}</th>
+              <th style={{ padding: '0.8rem 1rem', color: 'var(--text-secondary)', fontWeight: '600' }}>{lbl('Image', 'الصورة')}</th>
+              <th style={{ padding: '0.8rem 1rem', color: 'var(--text-secondary)', fontWeight: '600' }}>{lbl('Actions', 'الإجراءات')}</th>
             </tr>
           </thead>
           <tbody>
             {categories.map(cat => (
-              <tr key={cat.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <td style={{ padding: '1rem' }}>{cat.key}</td>
-                <td style={{ padding: '1rem' }}>{cat.name_en}</td>
-                <td style={{ padding: '1rem' }}>{cat.name_ar}</td>
-                <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => setFormData(cat)} style={{ padding: '0.4rem 0.8rem', backgroundColor: 'var(--gold)', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Edit</button>
-                  <button onClick={() => handleDelete(cat.id)} style={{ padding: '0.4rem 0.8rem', backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>
+              <tr key={cat.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <td style={{ padding: '0.8rem 1rem', color: 'var(--text-secondary)' }}>{cat.key}</td>
+                <td style={{ padding: '0.8rem 1rem' }}>
+                  <div style={{ fontWeight: '600' }}>{isRTL ? cat.name_ar : cat.name_en}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{isRTL ? cat.name_en : cat.name_ar}</div>
+                </td>
+                <td style={{ padding: '0.8rem 1rem' }}>
+                  {cat.img
+                    ? <img src={cat.img} alt="" style={{ width: '50px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} onError={e => { e.target.style.display = 'none'; }} />
+                    : <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>—</span>
+                  }
+                </td>
+                <td style={{ padding: '0.8rem 1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button onClick={() => setFormData({ ...cat, img: cat.img || '', desc_en: cat.desc_en || '', desc_ar: cat.desc_ar || '' })}
+                      style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(229,185,66,0.15)', color: 'var(--gold)', border: '1px solid var(--gold)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Pencil size={14} /> {lbl('Edit', 'تعديل')}
+                    </button>
+                    <button onClick={() => handleDelete(cat.id)}
+                      style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(200,16,46,0.15)', color: 'var(--brand-red)', border: '1px solid var(--brand-red)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Trash2 size={14} /> {lbl('Delete', 'حذف')}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
