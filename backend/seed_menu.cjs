@@ -1,0 +1,494 @@
+/**
+ * seed_menu.cjs  –  Al-Demashqi Restaurant Full Menu Seeder
+ * Clears existing categories + products and inserts the full menu.
+ * Run with:  node seed_menu.cjs
+ */
+
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
+
+const dbPath = path.resolve(__dirname, 'demashqi.db');
+const db = new sqlite3.Database(dbPath);
+
+// ─── 7 Main Categories ────────────────────────────────────────────────────────
+const CATEGORIES = [
+  {
+    key: 'shawarma',
+    name_en: 'Shawarma & Boxes',
+    name_ar: 'شاورما وبوكسات',
+    img: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=800&auto=format&fit=crop',
+    desc_en: 'Authentic Damascus-style shawarma wraps and rice boxes',
+    desc_ar: 'شاورما دمشقية أصيلة وبوكسات بالأرز',
+  },
+  {
+    key: 'sandwiches',
+    name_en: 'Sandwiches & Western',
+    name_ar: 'سندوتشات وغربي',
+    img: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=800&auto=format&fit=crop',
+    desc_en: 'Crispy burgers, chicken strips and western-style sandwiches',
+    desc_ar: 'برجر كريسبي وستربس واستراحة غربي',
+  },
+  {
+    key: 'crepe',
+    name_en: 'Crepe',
+    name_ar: 'كريب',
+    img: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=800&auto=format&fit=crop',
+    desc_en: 'Sweet and savoury thin French crêpes',
+    desc_ar: 'كريب فرنسي حلو ومالح',
+  },
+  {
+    key: 'pizza',
+    name_en: 'Pizza & Manakish',
+    name_ar: 'بيتزا ومناقيش',
+    img: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop',
+    desc_en: 'Stone-baked pizzas and authentic Syrian manakish',
+    desc_ar: 'بيتزا محجر ومناقيش سورية أصيلة',
+  },
+  {
+    key: 'meals',
+    name_en: 'Meals & Trays',
+    name_ar: 'وجبات وصواني',
+    img: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&auto=format&fit=crop',
+    desc_en: 'Full family meals, grills and Syrian-style rice trays',
+    desc_ar: 'وجبات عائلية كاملة ومشاوي وصواني أرز',
+  },
+  {
+    key: 'appetizers',
+    name_en: 'Fatteh & Appetizers',
+    name_ar: 'فتة ومقبلات',
+    img: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&auto=format&fit=crop',
+    desc_en: 'Levantine starters, dips and hot fattehs',
+    desc_ar: 'مقبلات شامية وفتة ساخنة وتشكيلة شرقية',
+  },
+  {
+    key: 'drinks',
+    name_en: 'Drinks & Bar',
+    name_ar: 'مشروبات وبار',
+    img: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=800&auto=format&fit=crop',
+    desc_en: 'Fresh juices, hot beverages and signature cocktails',
+    desc_ar: 'عصائر طازجة ومشروبات ساخنة وكوكتيل',
+  },
+];
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+const PRODUCTS = [
+
+  // ── SHAWARMA & BOXES ────────────────────────────────────────────────────────
+  {
+    category_key: 'shawarma', key: 'sh_wrap_chicken',
+    name_en: 'Chicken Shawarma Wrap', name_ar: 'شاورما دجاج (رول)',
+    desc_en: 'Marinated grilled chicken with garlic, pickles and fries in crispy bread',
+    desc_ar: 'دجاج مشوي متبل بالثومية والمخلل والبطاطس في خبز مقرمش',
+    price: { 'واحدة': 55, 'إثنين': 100 }, weight: '350g',
+    img: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'حارة', 'طحينة'], ingredients: ['دجاج', 'مخلل', 'بطاطس', 'طماطم', 'ثومية'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'shawarma', key: 'sh_wrap_meat',
+    name_en: 'Meat Shawarma Wrap', name_ar: 'شاورما لحم (رول)',
+    desc_en: 'Tender lamb shawarma with tahini, tomatoes and Syrian spices',
+    desc_ar: 'شاورما لحم خروف بالطحينة والطماطم والتوابل الدمشقية',
+    price: { 'واحدة': 70, 'إثنين': 130 }, weight: '380g',
+    img: 'https://images.unsplash.com/photo-1541014741259-de529411b96a?w=600&auto=format&fit=crop',
+    sauces: ['طحينة', 'طرشي', 'حارة'], ingredients: ['لحم', 'بصل', 'طماطم', 'طحينة', 'بقدونس'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'shawarma', key: 'sh_box_chicken',
+    name_en: 'Chicken Shawarma Box', name_ar: 'بوكس شاورما دجاج',
+    desc_en: 'Rice, chicken shawarma, salad, bread and garlic sauce',
+    desc_ar: 'أرز وشاورما دجاج وسلطة وخبز وثومية',
+    price: { 'عادي': 90, 'كبير': 120 }, weight: '550g',
+    img: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'طحينة', 'حارة'], ingredients: ['أرز', 'دجاج', 'سلطة', 'مخلل'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'shawarma', key: 'sh_box_meat',
+    name_en: 'Meat Shawarma Box', name_ar: 'بوكس شاورما لحم',
+    desc_en: 'Fragrant rice with meat shawarma, roasted nuts and mixed salad',
+    desc_ar: 'أرز عطري بشاورما لحم ومكسرات محمصة وسلطة مشكلة',
+    price: { 'عادي': 110, 'كبير': 150 }, weight: '600g',
+    img: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop',
+    sauces: ['طحينة', 'حارة'], ingredients: ['أرز', 'لحم', 'مكسرات', 'سلطة'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'shawarma', key: 'sh_mixed_box',
+    name_en: 'Mixed Shawarma Box', name_ar: 'بوكس مشكل (لحم ودجاج)',
+    desc_en: 'The best of both worlds – chicken and meat shawarma together',
+    desc_ar: 'الأفضل للأثنين – شاورما دجاج ولحم معاً في بوكس واحد',
+    price: { 'عادي': 120, 'كبير': 160 }, weight: '650g',
+    img: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'طحينة', 'حارة'], ingredients: ['أرز', 'دجاج', 'لحم', 'سلطة', 'مخلل'],
+    is_popular: 1, offer_type: 'daily',
+  },
+
+  // ── SANDWICHES & WESTERN ────────────────────────────────────────────────────
+  {
+    category_key: 'sandwiches', key: 'sw_crispy',
+    name_en: 'Crispy Chicken Sandwich', name_ar: 'سندوتش كريسبي دجاج',
+    desc_en: 'Extra crispy double-battered chicken fillet with coleslaw and pickles',
+    desc_ar: 'فيليه دجاج مقرمش مضاعف مع كول سلو ومخلل',
+    price: { 'عادي': 75, 'كبير + بطاطس': 110 }, weight: '300g',
+    img: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=600&auto=format&fit=crop',
+    sauces: ['مايونيز', 'حارة', 'BBQ'], ingredients: ['دجاج كريسبي', 'ملفوف', 'مخلل', 'خيار'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'sandwiches', key: 'sw_zinger',
+    name_en: 'Zinger Burger', name_ar: 'برجر زنجر',
+    desc_en: 'Spicy crispy chicken with jalapeños, cheese and ranch sauce',
+    desc_ar: 'دجاج كريسبي حار مع جالبينيو وجبنة وصوص رانش',
+    price: { 'عادي': 80, 'دبل': 120 }, weight: '320g',
+    img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop',
+    sauces: ['رانش', 'حارة', 'مايونيز'], ingredients: ['دجاج', 'جبنة', 'خس', 'جالبينيو'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'sandwiches', key: 'sw_smash',
+    name_en: 'Smash Burger', name_ar: 'سماش برجر',
+    desc_en: 'Pressed beef patty with caramelised onion, cheddar and mustard',
+    desc_ar: 'باتي لحم بقري مضغوط مع بصل كراميل وشيدر وخردل',
+    price: { 'سنجل': 85, 'دبل': 140 }, weight: '350g',
+    img: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=600&auto=format&fit=crop',
+    sauces: ['مايونيز', 'كاتشب', 'رانش'], ingredients: ['لحم بقري', 'جبنة', 'بصل', 'خس', 'طماطم'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'sandwiches', key: 'sw_strips',
+    name_en: 'Chicken Strips Meal', name_ar: 'وجبة ستربس دجاج',
+    desc_en: '5 crunchy chicken strips served with fries and your choice of dip',
+    desc_ar: '5 ستربس دجاج مقرمشة مع بطاطس وصوص باختيارك',
+    price: { '5 قطع': 80, '10 قطع': 145 }, weight: '400g',
+    img: 'https://images.unsplash.com/photo-1562967914-608f82629710?w=600&auto=format&fit=crop',
+    sauces: ['رانش', 'BBQ', 'ثومية'], ingredients: ['دجاج', 'بانيه', 'بطاطس'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'sandwiches', key: 'sw_liver',
+    name_en: 'Syrian Liver Sandwich', name_ar: 'سندوتش كبدة دمشقي',
+    desc_en: 'Spiced liver with tomatoes, peppers and garlic in Syrian bread',
+    desc_ar: 'كبدة متبلة بالطماطم والفلفل والثوم في خبز سوري',
+    price: 65, weight: '280g',
+    img: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop',
+    sauces: ['حارة', 'طحينة'], ingredients: ['كبدة', 'طماطم', 'فلفل', 'ثوم', 'بقدونس'],
+    is_popular: 0, offer_type: 'none',
+  },
+
+  // ── CREPE ──────────────────────────────────────────────────────────────────
+  {
+    category_key: 'crepe', key: 'cr_nutella',
+    name_en: 'Nutella Banana Crêpe', name_ar: 'كريب نوتيلا موز',
+    desc_en: 'Thin crêpe filled with Nutella and fresh sliced banana',
+    desc_ar: 'كريب رفيع مع نوتيلا وموز طازج مقطع',
+    price: 65, weight: '220g',
+    img: 'https://images.unsplash.com/photo-1519676867240-f03562e64548?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['نوتيلا', 'موز', 'قشطة'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'crepe', key: 'cr_chicken',
+    name_en: 'Chicken Mushroom Crêpe', name_ar: 'كريب دجاج مشروم',
+    desc_en: 'Savoury crêpe with grilled chicken strips, mushroom and bechamel',
+    desc_ar: 'كريب مالح مع شرائح دجاج مشوية ومشروم وبيشاميل',
+    price: 80, weight: '280g',
+    img: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=600&auto=format&fit=crop',
+    sauces: ['بيشاميل', 'كريم'], ingredients: ['دجاج', 'مشروم', 'جبنة', 'بيشاميل'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'crepe', key: 'cr_lotus',
+    name_en: 'Lotus Crêpe', name_ar: 'كريب لوتس',
+    desc_en: 'Sweet crêpe loaded with Lotus cream and biscuit crumble',
+    desc_ar: 'كريب حلو محشو بكريمة لوتس وفتات بسكويت',
+    price: 75, weight: '220g',
+    img: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['لوتس', 'كريمة', 'بسكويت'],
+    is_popular: 1, offer_type: 'weekly',
+  },
+  {
+    category_key: 'crepe', key: 'cr_mango',
+    name_en: 'Mango Crêpe', name_ar: 'كريب مانجو',
+    desc_en: 'Crêpe with fresh mango, cream and mango coulis',
+    desc_ar: 'كريب بالمانجو الطازجة والكريمة وكولي المانجو',
+    price: 70, weight: '220g',
+    img: 'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['مانجو', 'كريمة', 'سكر بودرة'],
+    is_popular: 0, offer_type: 'none',
+  },
+
+  // ── PIZZA & MANAKISH ────────────────────────────────────────────────────────
+  {
+    category_key: 'pizza', key: 'pz_margherita',
+    name_en: 'Margherita Pizza', name_ar: 'بيتزا مارغريتا',
+    desc_en: 'Classic stone-baked pizza with mozzarella, fresh tomato and basil',
+    desc_ar: 'بيتزا محجر كلاسيكية بالموزاريلا والطماطم الطازجة والريحان',
+    price: { 'M': 90, 'L': 130, 'XL': 170 }, weight: '450g',
+    img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&auto=format&fit=crop',
+    sauces: ['صوص طماطم'], ingredients: ['موزاريلا', 'طماطم', 'ريحان'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'pizza', key: 'pz_chicken_bbq',
+    name_en: 'Chicken BBQ Pizza', name_ar: 'بيتزا دجاج باربكيو',
+    desc_en: 'Smoky BBQ chicken, caramelised onions and double cheese',
+    desc_ar: 'دجاج بصوص باربكيو مدخن وبصل كراميل وجبنة مضاعفة',
+    price: { 'M': 110, 'L': 155, 'XL': 200 }, weight: '500g',
+    img: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop',
+    sauces: ['BBQ', 'طحينة'], ingredients: ['دجاج', 'جبنة', 'بصل', 'فلفل'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'pizza', key: 'pz_pepperoni',
+    name_en: 'Pepperoni Pizza', name_ar: 'بيتزا بيبروني',
+    desc_en: 'Loaded with premium pepperoni and stretchy mozzarella',
+    desc_ar: 'محملة ببيبروني فاخر وموزاريلا ممتدة',
+    price: { 'M': 115, 'L': 160, 'XL': 210 }, weight: '500g',
+    img: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=600&auto=format&fit=crop',
+    sauces: ['صوص طماطم', 'حارة'], ingredients: ['بيبروني', 'موزاريلا', 'طماطم'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'pizza', key: 'mn_zaatar',
+    name_en: 'Zaatar Manakish', name_ar: 'منقوشة زعتر',
+    desc_en: 'Authentic Syrian flatbread topped with wild thyme, olive oil and sesame',
+    desc_ar: 'فطيرة سورية أصيلة بالزعتر البري وزيت الزيتون والسمسم',
+    price: { 'صغير': 30, 'كبير': 55 }, weight: '200g',
+    img: 'https://images.unsplash.com/photo-1609501676725-7186f017a4b7?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['زعتر', 'زيت زيتون', 'سمسم'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'pizza', key: 'mn_cheese',
+    name_en: 'Cheese Manakish', name_ar: 'منقوشة جبنة',
+    desc_en: 'Crispy flatbread with Akkawi and mozzarella cheese blend',
+    desc_ar: 'فطيرة مقرمشة بمزيج جبنة عكاوي وموزاريلا',
+    price: { 'صغير': 40, 'كبير': 65 }, weight: '220g',
+    img: 'https://images.unsplash.com/photo-1561043433-aaf687c4cf04?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['جبنة عكاوي', 'موزاريلا'],
+    is_popular: 0, offer_type: 'none',
+  },
+
+  // ── MEALS & TRAYS ───────────────────────────────────────────────────────────
+  {
+    category_key: 'meals', key: 'ml_grilled_chicken',
+    name_en: 'Grilled Chicken Meal', name_ar: 'وجبة دجاج مشوي',
+    desc_en: 'Half grilled chicken, Syrian rice, salad and pickles',
+    desc_ar: 'نصف دجاجة مشوية وأرز شامي وسلطة ومخلل',
+    price: { 'ورك': 120, 'صدر': 130, 'كامل': 220 }, weight: '700g',
+    img: 'https://images.unsplash.com/photo-1598515213692-b52b6b9b8c4d?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'طحينة', 'حارة'], ingredients: ['دجاج', 'أرز', 'سلطة', 'مخلل'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'meals', key: 'ml_kabab',
+    name_en: 'Mixed Grill Kabab', name_ar: 'كباب مشكل مشوي',
+    desc_en: 'Assortment of lamb kofta, chicken shish and seekh kababs with rice',
+    desc_ar: 'تشكيلة كفتة خروف وشيش دجاج وكباب مع أرز',
+    price: { 'فردي': 150, 'عائلي': 280 }, weight: '600g',
+    img: 'https://images.unsplash.com/photo-1544025162-d76538f4c703?w=600&auto=format&fit=crop',
+    sauces: ['طحينة', 'حارة'], ingredients: ['لحم خروف', 'دجاج', 'أرز', 'سلطة'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'meals', key: 'ml_tray_chicken',
+    name_en: 'Chicken Rice Tray', name_ar: 'صينية دجاج بالأرز',
+    desc_en: 'Family-size Syrian rice with roasted chicken, nuts and raisins',
+    desc_ar: 'صينية عائلية من الأرز الشامي بالدجاج المحمر والمكسرات والزبيب',
+    price: { '2 أشخاص': 200, '4 أشخاص': 380, '6 أشخاص': 550 }, weight: '1200g',
+    img: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'لبن'], ingredients: ['أرز', 'دجاج', 'مكسرات', 'زبيب', 'بهارات شامية'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'meals', key: 'ml_broasted',
+    name_en: 'Broasted Chicken Meal', name_ar: 'وجبة دجاج بروستد',
+    desc_en: 'Pressure-fried golden chicken pieces with fries and coleslaw',
+    desc_ar: 'قطع دجاج ذهبية مقلية بالضغط مع بطاطس وكول سلو',
+    price: { '2 قطع': 95, '4 قطع': 170 }, weight: '600g',
+    img: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'كاتشب', 'حارة'], ingredients: ['دجاج', 'بطاطس', 'ملفوف'],
+    is_popular: 0, offer_type: 'none',
+  },
+
+  // ── FATTEH & APPETIZERS ─────────────────────────────────────────────────────
+  {
+    category_key: 'appetizers', key: 'app_fatteh',
+    name_en: 'Syrian Fatteh', name_ar: 'فتة شامية',
+    desc_en: 'Toasted bread, chickpeas, garlic yogurt and tahini drizzle',
+    desc_ar: 'خبز محمص وحمص وزبادي بالثوم وطحينة',
+    price: { 'فردية': 60, 'كبيرة': 95 }, weight: '350g',
+    img: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&auto=format&fit=crop',
+    sauces: ['ثومية', 'طحينة'], ingredients: ['خبز', 'حمص', 'زبادي', 'طحينة', 'دجاج'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'appetizers', key: 'app_hummus',
+    name_en: 'Hummus with Meat', name_ar: 'حمص باللحم',
+    desc_en: 'Silky hummus topped with spiced minced meat and pine nuts',
+    desc_ar: 'حمص كريمي مع لحم مفروم متبل وصنوبر',
+    price: 55, weight: '280g',
+    img: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=600&auto=format&fit=crop',
+    sauces: ['زيت زيتون', 'حارة'], ingredients: ['حمص', 'لحم', 'صنوبر', 'بابريكا'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'appetizers', key: 'app_mutabbal',
+    name_en: 'Mutabbal (Baba Ghanouj)', name_ar: 'متبل (بابا غنوج)',
+    desc_en: 'Smoky roasted aubergine dip with tahini, garlic and pomegranate',
+    desc_ar: 'باذنجان مشوي مدخن مع طحينة وثوم ورمان',
+    price: 45, weight: '200g',
+    img: 'https://images.unsplash.com/photo-1571193099945-f24f49bce03a?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['باذنجان', 'طحينة', 'ثوم', 'رمان', 'زيت زيتون'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'appetizers', key: 'app_kibbeh',
+    name_en: 'Fried Kibbeh', name_ar: 'كبة مقلية',
+    desc_en: 'Crispy stuffed bulgur shells with spiced lamb and pine nuts',
+    desc_ar: 'قشرة برغل مقرمشة محشوة بلحم خروف متبل وصنوبر',
+    price: { '3 حبات': 50, '6 حبات': 90 }, weight: '300g',
+    img: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=600&auto=format&fit=crop',
+    sauces: ['طحينة', 'حارة'], ingredients: ['برغل', 'لحم', 'بصل', 'صنوبر', 'بهارات'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'appetizers', key: 'app_fries',
+    name_en: 'Loaded Cheese Fries', name_ar: 'بطاطس بالجبنة',
+    desc_en: 'Golden crispy fries smothered in melted cheese sauce and jalapeños',
+    desc_ar: 'بطاطس ذهبية مقرمشة بصوص الجبنة المذاب والجالبينيو',
+    price: { 'عادي': 45, 'كبير': 70 }, weight: '350g',
+    img: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&auto=format&fit=crop',
+    sauces: ['جبنة', 'كاتشب', 'حارة'], ingredients: ['بطاطس', 'جبنة', 'جالبينيو'],
+    is_popular: 1, offer_type: 'none',
+  },
+
+  // ── DRINKS & BAR ────────────────────────────────────────────────────────────
+  {
+    category_key: 'drinks', key: 'dr_lemonade',
+    name_en: 'Fresh Lemonade', name_ar: 'ليمون بالنعناع طازج',
+    desc_en: 'Freshly squeezed lemon with mint and crushed ice',
+    desc_ar: 'ليمون معصور طازج بالنعناع والثلج المكسور',
+    price: 35, weight: '400ml',
+    img: 'https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['ليمون', 'نعناع', 'سكر', 'ثلج'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'drinks', key: 'dr_cocktail',
+    name_en: 'Tropical Fruit Cocktail', name_ar: 'كوكتيل فواكه استوائية',
+    desc_en: 'Blended mango, passion fruit and strawberry smoothie',
+    desc_ar: 'مانجو وفاكهة الشغف وفراولة ممزوجة',
+    price: 55, weight: '450ml',
+    img: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['مانجو', 'فاكهة شغف', 'فراولة', 'ثلج'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'drinks', key: 'dr_latte',
+    name_en: 'Damascus Latte', name_ar: 'لاتيه دمشقي',
+    desc_en: 'Aromatic espresso with rose water and cardamom cream',
+    desc_ar: 'إسبريسو عطري بماء الورد وكريمة هيل',
+    price: 50, weight: '350ml',
+    img: 'https://images.unsplash.com/photo-1485808191679-5f86510bd9d4?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['قهوة', 'ماء ورد', 'هيل', 'حليب'],
+    is_popular: 1, offer_type: 'none',
+  },
+  {
+    category_key: 'drinks', key: 'dr_jallab',
+    name_en: 'Jallab', name_ar: 'جلاب',
+    desc_en: 'Traditional Levantine grape & rose drink with pine nuts',
+    desc_ar: 'مشروب عنب وورد شامي تقليدي مع صنوبر',
+    price: 40, weight: '400ml',
+    img: 'https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['عصير عنب', 'ماء ورد', 'صنوبر', 'ثلج'],
+    is_popular: 0, offer_type: 'none',
+  },
+  {
+    category_key: 'drinks', key: 'dr_ayran',
+    name_en: 'Ayran (Cold Yogurt Drink)', name_ar: 'عيران (لبن مثلج)',
+    desc_en: 'Chilled salted yogurt drink – the perfect shawarma companion',
+    desc_ar: 'لبن مثلج مملح – الصديق المثالي للشاورما',
+    price: 25, weight: '300ml',
+    img: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&auto=format&fit=crop',
+    sauces: [], ingredients: ['زبادي', 'ملح', 'ثلج'],
+    is_popular: 0, offer_type: 'none',
+  },
+];
+
+// ─── Seed Logic ───────────────────────────────────────────────────────────────
+db.serialize(() => {
+  db.run('PRAGMA journal_mode = WAL');
+  db.run('BEGIN TRANSACTION');
+
+  // 1) Drop and recreate tables to ensure schema matches exactly
+  db.run('DROP TABLE IF EXISTS products');
+  db.run('DROP TABLE IF EXISTS categories');
+
+  db.run(`CREATE TABLE categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    name_en TEXT NOT NULL,
+    name_ar TEXT NOT NULL,
+    img TEXT,
+    desc_en TEXT,
+    desc_ar TEXT
+  )`);
+
+  db.run(`CREATE TABLE products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_key TEXT NOT NULL,
+    key TEXT UNIQUE NOT NULL,
+    name_en TEXT NOT NULL,
+    name_ar TEXT NOT NULL,
+    desc_en TEXT NOT NULL,
+    desc_ar TEXT NOT NULL,
+    price TEXT NOT NULL,
+    img TEXT,
+    weight TEXT,
+    sauces TEXT,
+    ingredients TEXT,
+    is_popular INTEGER DEFAULT 0,
+    offer_type TEXT DEFAULT 'none'
+  )`);
+
+  // 2) Insert categories
+  const catStmt = db.prepare(
+    'INSERT OR REPLACE INTO categories (key, name_en, name_ar, img, desc_en, desc_ar) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  CATEGORIES.forEach(c => {
+    catStmt.run([c.key, c.name_en, c.name_ar, c.img, c.desc_en, c.desc_ar]);
+  });
+  catStmt.finalize();
+
+  // 3) Insert products
+  const prodStmt = db.prepare(`
+    INSERT OR REPLACE INTO products
+      (category_key, key, name_en, name_ar, desc_en, desc_ar, price, img, weight, sauces, ingredients, is_popular, offer_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  PRODUCTS.forEach(p => {
+    prodStmt.run([
+      p.category_key, p.key, p.name_en, p.name_ar,
+      p.desc_en, p.desc_ar,
+      JSON.stringify(p.price),
+      p.img, p.weight,
+      JSON.stringify(p.sauces || []),
+      JSON.stringify(p.ingredients || []),
+      p.is_popular || 0,
+      p.offer_type || 'none',
+    ]);
+  });
+  prodStmt.finalize();
+
+  db.run('COMMIT', (err) => {
+    if (err) {
+      console.error('❌ Seed FAILED:', err.message);
+    } else {
+      console.log(`✅ Seeded ${CATEGORIES.length} categories and ${PRODUCTS.length} products.`);
+    }
+    db.close();
+  });
+});

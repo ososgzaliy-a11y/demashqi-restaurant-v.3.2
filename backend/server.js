@@ -236,7 +236,7 @@ app.delete('/api/admin/products/:id', (req, res, next) => {
 // Admin Login
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
-  const adminPassword = process.env.ADMIN_PASSWORD || 'miralevishipkits';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   if (password === adminPassword) {
     res.json({ success: true, token: 'authenticated-admin-token' });
   } else {
