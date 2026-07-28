@@ -617,3 +617,56 @@ select {
     min-width: 180px;
   }
 }
+
+/* ============================================
+   Cart Drawer Custom Scrollbar & Containment
+   ============================================ */
+.cart-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+  overscroll-behavior: contain;
+}
+
+.cart-scroll-container::-webkit-scrollbar {
+  width: 5px;
+}
+.cart-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cart-scroll-container::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 10px;
+}
+
+/* ============================================
+   Offer Cards Shimmer & Hover Animations
+   ============================================ */
+.offer-card {
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, border-color 0.4s ease !important;
+  overflow: hidden;
+}
+
+.offer-card:hover {
+  transform: scale(1.05) translateY(-5px) !important;
+  opacity: 1 !important;
+  box-shadow: 0 20px 40px rgba(229, 185, 66, 0.3), 0 0 20px rgba(229, 185, 66, 0.2) !important;
+  border-color: var(--gold) !important;
+  z-index: 10 !important;
+}
+
+/* Shimmer effect */
+.offer-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(229, 185, 66, 0.2), transparent);
+  transform: skewX(-20deg);
+  transition: 0s;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.offer-card:hover::before {
+  left: 200%;
+  transition: left 0.8s ease-in-out;
+}

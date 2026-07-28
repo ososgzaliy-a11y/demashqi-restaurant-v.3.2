@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function OffersSlider({ products, onItemClick }) {
+export default function OffersSlider({ products, items, onItemClick, title }) {
   const { language } = useLanguage();
   const isRTL = language === 'ar';
   const containerRef = useRef(null);
@@ -9,8 +9,8 @@ export default function OffersSlider({ products, onItemClick }) {
   const [isHovered, setIsHovered] = useState(false);
   const intervalRef = useRef(null);
 
-  // Get popular items for the offers (duplicate list for seamless loop)
-  const offerItems = products.filter(p => p.is_popular === 1).slice(0, 8);
+  // Get items (use passed items, or fallback to popular)
+  const offerItems = items || (products ? products.filter(p => p.is_popular === 1).slice(0, 8) : []);
 
   const formatPrice = (price) => {
     if (typeof price === 'object' && price !== null) {
@@ -35,12 +35,15 @@ export default function OffersSlider({ products, onItemClick }) {
     return () => clearInterval(intervalRef.current);
   }, [isHovered, goToNext, offerItems.length]);
 
-  // Sync scroll position when auto-playing
+  // Sync scroll position when auto-playing without causing vertical page jumps
   useEffect(() => {
     if (!containerRef.current || isHovered) return;
     const cards = containerRef.current.querySelectorAll('.offer-card');
-    if (cards[activeIndex]) {
-      cards[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const card = cards[activeIndex];
+    if (card) {
+      const container = containerRef.current;
+      const scrollPos = card.offsetLeft - container.offsetLeft - (container.clientWidth / 2) + (card.clientWidth / 2);
+      container.scrollTo({ left: scrollPos, behavior: 'smooth' });
     }
   }, [activeIndex, isHovered]);
 
@@ -60,21 +63,23 @@ export default function OffersSlider({ products, onItemClick }) {
   return (
     <div style={{ marginBottom: '3rem' }}>
       {/* Title */}
-      <h3 style={{
-        color: 'var(--gold)',
-        padding: '0 1rem',
-        marginBottom: '1.5rem',
-        fontSize: 'clamp(1.4rem, 4vw, 1.8rem)',
-        textAlign: isRTL ? 'right' : 'left',
-        fontWeight: '900',
-        letterSpacing: '1px'
-      }}>
-        {language === 'ar' ? '🔥 عروض مميزة' : '🔥 Special Offers'}
-      </h3>
+      {title !== null && (
+        <h3 style={{
+          color: 'var(--gold)',
+          padding: '0 1rem',
+          marginBottom: '1.5rem',
+          fontSize: 'clamp(1.4rem, 4vw, 1.8rem)',
+          textAlign: isRTL ? 'right' : 'left',
+          fontWeight: '900',
+          letterSpacing: '1px'
+        }}>
+          {title || (language === 'ar' ? '🔥 عروض مميزة' : '🔥 Special Offers')}
+        </h3>
+      )}
 
       {/* Slider Track */}
       <div
-        style={{ position: 'relative' }}
+        style={{ position: 'relative', overflow: 'hidden' }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onTouchStart={() => setIsHovered(true)}
@@ -87,12 +92,14 @@ export default function OffersSlider({ products, onItemClick }) {
               display: 'flex',
               gap: '1.5rem',
               overflowX: 'auto',
-              padding: '0.5rem 1rem 1.5rem 1rem',
-              scrollBehavior: 'smooth',
+              padding: '1.5rem 1rem 2rem 1rem', // Add padding for shadow and scaling
               msOverflowStyle: 'none',
               scrollbarWidth: 'none',
               scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y', // ensure vertical scroll is not blocked
+              height: '420px', // Fixed height to prevent shifting
+              alignItems: 'center',
             }}
             className="hide-scrollbar"
           >
@@ -106,18 +113,20 @@ export default function OffersSlider({ products, onItemClick }) {
                 style={{
                   flex: '0 0 auto',
                   width: '260px',
+                  height: '350px', // Fixed card height
                   padding: '1.2rem',
                   borderRadius: '16px',
                   backgroundColor: 'var(--card-bg)',
-                  border: isActive ? '2px solid var(--gold)' : '1px solid rgba(229,185,66,0.2)',
+                  border: isActive ? '2px solid var(--brand-red)' : '1px solid rgba(229,185,66,0.2)',
                   boxShadow: isActive
-                    ? '0 16px 40px rgba(229,185,66,0.3)'
+                    ? '0 0 20px rgba(220,38,38,0.3)'
                     : '0 4px 12px rgba(0,0,0,0.3)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1rem',
-                  // Spotlight / Zoom effect on active
-                  transform: isActive ? 'scale(1.08) translateY(-6px)' : 'scale(1) translateY(0)',
+                  // Skip/Slide Transition effect
+                  transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                  opacity: isActive ? 1 : 0.7,
                   transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                   cursor: 'pointer',
                   zIndex: isActive ? 2 : 1,
@@ -137,11 +146,23 @@ export default function OffersSlider({ products, onItemClick }) {
                   }} />
                 )}
 
+                {/* Offer Badge */}
+                {item.offer_type && item.offer_type !== 'none' && (
+                  <div style={{ position: 'absolute', top: '1rem', right: '1rem', backgroundColor: 'var(--brand-red)', color: '#fff', padding: '0.3rem 0.8rem', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.8rem', zIndex: 3, boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+                    {item.offer_type === 'daily' 
+                      ? (language === 'ar' ? 'عرض اليوم' : "Today's Offer") 
+                      : item.offer_type === 'weekly'
+                      ? (language === 'ar' ? 'عرض الأسبوع' : 'Weekly Offer')
+                      : (language === 'ar' ? 'الأكثر طلباً' : 'Best Seller')}
+                  </div>
+                )}
+
                 {item.img && (
                   <img
+                    loading="lazy"
                     src={item.img}
                     alt={item.name_en}
-                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', position: 'relative', zIndex: 1 }}
+                    style={{ width: '100%', height: '140px', minHeight: '140px', objectFit: 'cover', borderRadius: '8px', position: 'relative', zIndex: 1 }}
                     onError={e => { e.target.style.display = 'none'; }}
                   />
                 )}

@@ -57,7 +57,8 @@ const orderSchema = z.object({
   address: z.string().min(5, "Address is required").max(500),
   phone: z.string().min(7, "Phone is required").max(20),
   notes: z.string().max(1000).optional(),
-  paymentMethod: z.string().max(50)
+  paymentMethod: z.string().max(50),
+  daily_id: z.number().optional()
 });
 
 // Stripe setup (optional)
@@ -138,8 +139,10 @@ app.post('/api/contact', (req, res, next) => {
 app.post('/api/orders', (req, res, next) => {
   try {
     const data = orderSchema.parse(req.body);
-    const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod) VALUES (?, ?, ?, ?, ?, ?)');
-    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod], function(err) {
+    const createdAt = Date.now();
+    const dailyId = data.daily_id || 1;
+    const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod, created_at, daily_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod, createdAt, dailyId], function(err) {
       if (err) {
         return next(err);
       }
@@ -265,10 +268,41 @@ app.put('/api/admin/orders/:id', (req, res, next) => {
     return res.status(400).json({ error: 'Invalid status' });
   }
 
-  db.run('UPDATE orders SET status = ? WHERE id = ?', [status, id], function(err) {
+  const archivedAt = (status === 'completed' || status === 'cancelled') ? Date.now() : null;
+
+  db.run('UPDATE orders SET status = ?, archived_at = ? WHERE id = ?', [status, archivedAt, id], function(err) {
     if (err) return next(err);
     if (this.changes === 0) return res.status(404).json({ error: 'Order not found' });
-    res.json({ success: true, id, status });
+    res.json({ success: true, id, status, archived_at: archivedAt });
+  });
+});
+
+// Admin Auto-Cleanup Old Archived Orders (older than 2 minutes for testing)
+app.delete('/api/admin/orders/cleanup', (req, res, next) => {
+  const TWO_MINUTES = 2 * 60 * 1000;
+  const cutoffTime = Date.now() - TWO_MINUTES;
+  
+  db.run('DELETE FROM orders WHERE archived_at IS NOT NULL AND archived_at < ?', [cutoffTime], function(err) {
+    if (err) return next(err);
+    res.json({ success: true, deletedCount: this.changes });
+  });
+});
+
+// Admin Clear All Archived Orders Manually
+app.delete('/api/admin/orders/archive', (req, res, next) => {
+  db.run('DELETE FROM orders WHERE archived_at IS NOT NULL', [], function(err) {
+    if (err) return next(err);
+    res.json({ success: true, deletedCount: this.changes });
+  });
+});
+
+// Admin Delete Order
+app.delete('/api/admin/orders/:id', (req, res, next) => {
+  const { id } = req.params;
+  db.run('DELETE FROM orders WHERE id = ?', [id], function(err) {
+    if (err) return next(err);
+    if (this.changes === 0) return res.status(404).json({ error: 'Order not found' });
+    res.json({ success: true });
   });
 });
 
@@ -307,7 +341,7 @@ app.get('/api/admin/contacts', (req, res, next) => {
 // Public Track Single Order Status
 app.get('/api/orders/:id', (req, res, next) => {
   const { id } = req.params;
-  db.get('SELECT id, status, total, address, paymentMethod, created_at FROM orders WHERE id = ?', [id], (err, row) => {
+  db.get('SELECT id, status, total, address, paymentMethod, created_at, daily_id FROM orders WHERE id = ?', [id], (err, row) => {
     if (err) return next(err);
     if (!row) return res.status(404).json({ error: 'Order not found' });
     res.json(row);

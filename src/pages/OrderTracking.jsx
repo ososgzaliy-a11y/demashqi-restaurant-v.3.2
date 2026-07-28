@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Clock, Utensils, Truck, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+
+const CANCELLATION_WINDOW_MINUTES = 2; // دقيقتين
 
 export default function OrderTracking() {
   const [searchParams] = useSearchParams();
@@ -14,6 +16,8 @@ export default function OrderTracking() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [timeLeft, setTimeLeft] = useState(0);
+  const autoPreparedRef = useRef(false);
 
   const fetchOrderStatus = async (idToFetch) => {
     if (!idToFetch) return;
@@ -25,7 +29,7 @@ export default function OrderTracking() {
       if (response.ok) {
         setOrder(data);
       } else {
-        setError(t('track.notFound'));
+        setError(isRTL ? "عذراً، رقم الطلب غير موجود أو تم حذفه" : "Sorry, the order number does not exist or has been deleted.");
         setOrder(null);
       }
     } catch (err) {
@@ -50,6 +54,26 @@ export default function OrderTracking() {
     }, 8000);
     return () => clearInterval(intervalId);
   }, [orderIdParam]);
+
+  const handleCancelOrder = async () => {
+    if (!window.confirm(isRTL ? 'هل أنت متأكد أنك تريد إلغاء الطلب؟' : 'Are you sure you want to cancel the order?')) return;
+    try {
+      await fetch(`http://${window.location.hostname}:3000/api/admin/orders/${order.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+      fetchOrderStatus(order.id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const parseDate = (createdAt) => {
+    const numeric = Number(createdAt);
+    if (!isNaN(numeric) && numeric > 1000000000) return new Date(numeric);
+    return new Date(createdAt);
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -195,10 +219,10 @@ export default function OrderTracking() {
             >
               <div>
                 <h2 style={{ fontSize: 'clamp(1.4rem, 5vw, 1.8rem)', color: 'var(--gold)', margin: 0 }}>
-                  {t('track.orderNum')}{order.id}
+                  {t('track.orderNum')}{order.daily_id || order.id}
                 </h2>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.8rem, 2.5vw, 0.95rem)', display: 'block', marginTop: '0.3rem' }}>
-                  {t('track.placedOn')}{' '}{new Date(order.created_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                  {t('track.placedOn')}{' '}{parseDate(order.created_at).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US')}
                 </span>
               </div>
               <div style={{ textAlign: isRTL ? 'left' : 'right' }}>
@@ -212,91 +236,139 @@ export default function OrderTracking() {
             </div>
 
             {/* Progress Stepper */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                position: 'relative',
-                margin: 'clamp(1.5rem, 4vw, 3rem) 0',
-                gap: '0.5rem',
-              }}
-            >
-              {/* Progress Line */}
+            {order.status === 'cancelled' ? (
               <div
+                className="scale-in"
                 style={{
-                  position: 'absolute',
-                  top: '24px',
-                  [isRTL ? 'right' : 'left']: '10%',
-                  width: '80%',
-                  height: '4px',
-                  backgroundColor: 'var(--border-color)',
-                  zIndex: 1,
+                  margin: 'clamp(1.5rem, 4vw, 3rem) 0',
+                  padding: '1.5rem',
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  border: '1px solid var(--brand-red)',
+                  borderRadius: '12px',
+                  color: 'var(--brand-red)',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.8rem'
                 }}
               >
+                <AlertCircle size={48} />
+                <span style={{ fontSize: 'clamp(1.1rem, 3vw, 1.3rem)' }}>
+                  {isRTL ? 'تم إلغاء هذا الطلب من قبل المطعم' : 'This order has been cancelled by the restaurant'}
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  position: 'relative',
+                  margin: 'clamp(1.5rem, 4vw, 3rem) 0',
+                  gap: '0.5rem',
+                }}
+              >
+                {/* Progress Line */}
                 <div
                   style={{
-                    height: '100%',
-                    backgroundColor: 'var(--brand-red)',
-                    width: `${((currentStep - 1) / 3) * 100}%`,
-                    transition: 'width 0.6s ease',
-                    // RTL: progress goes from right
-                    ...(isRTL && { marginLeft: 'auto' }),
+                    position: 'absolute',
+                    top: '24px',
+                    [isRTL ? 'right' : 'left']: '10%',
+                    width: '80%',
+                    height: '4px',
+                    backgroundColor: 'var(--border-color)',
+                    zIndex: 1,
                   }}
-                />
-              </div>
-
-              {/* Steps */}
-              {steps.map((step, index) => {
-                const stepNum = index + 1;
-                const isActive = currentStep >= stepNum;
-                const Icon = step.icon;
-                return (
+                >
                   <div
-                    key={index}
                     style={{
-                      zIndex: 2,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      flex: 1,
-                      gap: '0.6rem',
+                      height: '100%',
+                      backgroundColor: 'var(--brand-red)',
+                      width: `${((currentStep - 1) / 3) * 100}%`,
+                      transition: 'width 0.6s ease',
+                      // RTL: progress goes from right
+                      ...(isRTL && { marginLeft: 'auto' }),
                     }}
-                  >
+                  />
+                </div>
+
+                {/* Steps */}
+                {steps.map((step, index) => {
+                  const stepNum = index + 1;
+                  const isActive = currentStep >= stepNum;
+                  const Icon = step.icon;
+                  return (
                     <div
+                      key={index}
                       style={{
-                        width: 'clamp(40px, 10vw, 52px)',
-                        height: 'clamp(40px, 10vw, 52px)',
-                        borderRadius: '50%',
-                        backgroundColor: isActive ? 'var(--brand-red)' : 'var(--card-bg)',
-                        border: `2px solid ${isActive ? 'var(--brand-red)' : 'var(--border-color)'}`,
+                        zIndex: 2,
                         display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isActive ? '#fff' : 'var(--text-secondary)',
-                        transition: 'all 0.4s ease',
-                        boxShadow: isActive ? '0 0 12px rgba(200,16,46,0.35)' : 'none',
+                        flex: 1,
+                        gap: '0.6rem',
                       }}
                     >
-                      <Icon size={20} />
+                      <div
+                        style={{
+                          width: 'clamp(40px, 10vw, 52px)',
+                          height: 'clamp(40px, 10vw, 52px)',
+                          borderRadius: '50%',
+                          backgroundColor: isActive ? 'var(--brand-red)' : 'var(--card-bg)',
+                          border: `2px solid ${isActive ? 'var(--brand-red)' : 'var(--border-color)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isActive ? '#fff' : 'var(--text-secondary)',
+                          transition: 'all 0.4s ease',
+                          boxShadow: isActive ? '0 0 12px rgba(200,16,46,0.35)' : 'none',
+                        }}
+                      >
+                        <Icon size={20} />
+                      </div>
+                      <span
+                        style={{
+                          fontWeight: 'bold',
+                          color: isActive ? 'var(--gold)' : 'var(--text-secondary)',
+                          fontSize: 'clamp(0.68rem, 2vw, 0.9rem)',
+                          textAlign: 'center',
+                          lineHeight: 1.3,
+                          transition: 'color 0.4s ease',
+                          maxWidth: '70px',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {step.label}
+                      </span>
                     </div>
-                    <span
-                      style={{
-                        fontWeight: 'bold',
-                        color: isActive ? 'var(--gold)' : 'var(--text-secondary)',
-                        fontSize: 'clamp(0.68rem, 2vw, 0.9rem)',
-                        textAlign: 'center',
-                        lineHeight: 1.3,
-                        transition: 'color 0.4s ease',
-                        maxWidth: '70px',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Cancellation Logic */}
+            {order.status === 'pending' && (
+              <div className="scale-in" style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <span style={{ color: 'var(--brand-red)', fontWeight: 'bold' }}>
+                  {isRTL 
+                    ? `يمكنك إلغاء الطلب الآن قبل بدء التحضير` 
+                    : `You can cancel the order before preparation begins`}
+                </span>
+                <button 
+                  onClick={handleCancelOrder}
+                  style={{ padding: '0.6rem 1.2rem', backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  {isRTL ? 'إلغاء الطلب' : 'Cancel Order'}
+                </button>
+              </div>
+            )}
+            
+            {order.status !== 'pending' && order.status !== 'cancelled' && (
+              <div className="scale-in" style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'rgba(234,179,8,0.1)', borderRadius: '8px', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308', fontWeight: 'bold', textAlign: 'center' }}>
+                {isRTL ? 'الطلب قيد التحضير حالياً في المطبخ ولا يمكن إلغاؤه' : 'The order is currently being prepared in the kitchen and cannot be cancelled.'}
+              </div>
+            )}
 
             {/* Delivery Address */}
             <div

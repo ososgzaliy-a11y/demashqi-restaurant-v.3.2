@@ -1,84 +1,52 @@
-import Fuse from 'fuse.js';
-import foodDictionary from '../data/food_dictionary.json';
-
-// --- Advanced Phonetic Normalization ---
 export const normalizeText = (text) => {
   if (!text) return '';
   return text
     .replace(/[أإآ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
-    .replace(/غ/g, 'ج') // Phonetic matching for words like مارغريتا / مارجريتا and برغر / برجر
+    .replace(/غ/g, 'ج') // Phonetic mapping
     .replace(/[\u064B-\u065F]/g, '') // Remove tashkeel
-    .replace(/\s+/g, ' ')           // Collapse multiple spaces
-    .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .trim();
 };
 
-// --- Build Synonym Lookup from External Dictionary ---
-const synonymLookup = {};
-foodDictionary.synonym_groups.forEach(group => {
-  const normalizedGroup = group.map(normalizeText);
-  normalizedGroup.forEach(word => {
-    synonymLookup[word] = normalizedGroup;
-  });
-});
+const synonymMap = {
+  'مانجا': 'مانجو',
+  'مانجو': 'مانجا',
+  'فراخ': 'دجاج',
+  'دجاج': 'فراخ',
+  'شاورمه': 'شاورما',
+  'شاورما': 'شاورمه',
+  'سندوتش': 'ساندوتش',
+  'سندويش': 'ساندوتش',
+  'صندويش': 'ساندوتش',
+  'بطاطس': 'باتاتا',
+  'بيبسي': 'مشروب'
+};
 
-// Given a user search query, expand it into a set of all synonym words to search for
-export const expandSearchQuery = (query) => {
-  const normalizedQuery = normalizeText(query);
-  const terms = new Set();
-  terms.add(normalizedQuery);
-
-  // Check each synonym group: if any word in a group is found inside the query (or vice versa), add all words in that group
-  for (const word in synonymLookup) {
-    if (normalizedQuery.includes(word) || word.includes(normalizedQuery)) {
-      synonymLookup[word].forEach(syn => terms.add(syn));
-    }
-  }
-
-  return [...terms];
+const getSearchVariants = (term) => {
+  const normalized = normalizeText(term);
+  const synonym = synonymMap[normalized];
+  return synonym ? [normalized, normalizeText(synonym)] : [normalized];
 };
 
 export const searchMenuItems = (searchQuery, allItemsFlattened) => {
   if (!searchQuery) return [];
+  
+  const queryWords = searchQuery.trim().split(' ').filter(Boolean);
 
-  const expandedTerms = expandSearchQuery(searchQuery);
+  const results = allItemsFlattened.filter((item) => {
+    const name = normalizeText(item.name || item.name_ar || item.name_en);
+    const desc = normalizeText(item.desc || item.desc_ar || item.desc_en);
+    const category = normalizeText(item.category_key || item.category);
 
-  const searchableData = allItemsFlattened.map(item => ({
-    ...item,
-    searchName: normalizeText(item.name),
-    searchDesc: normalizeText(item.desc),
-    searchIngredients: normalizeText(item.ingredients ? JSON.stringify(item.ingredients) : ''),
-  }));
-
-  const fuse = new Fuse(searchableData, {
-    keys: ['searchName', 'searchDesc', 'searchIngredients'],
-    threshold: 0.4, // User requested 0.4 threshold
-    ignoreLocation: true,
-    distance: 100
-  });
-
-  // Search for each expanded term individually and merge unique results
-  const allResults = [];
-  const seenIds = new Set();
-
-  expandedTerms.forEach(term => {
-    const results = fuse.search(term);
-    results.forEach(res => {
-      if (!seenIds.has(res.item.id)) {
-        seenIds.add(res.item.id);
-        allResults.push(res.item);
-      }
+    return queryWords.every(word => {
+      const variants = getSearchVariants(word);
+      return variants.some((v) =>
+        name.includes(v) || desc.includes(v) || category.includes(v)
+      );
     });
   });
-
-  // Sort by popularity (is_popular: 1 first)
-  allResults.sort((a, b) => {
-    const popA = a.is_popular ? 1 : 0;
-    const popB = b.is_popular ? 1 : 0;
-    return popB - popA;
-  });
-
-  return allResults;
+  
+  return results;
 };

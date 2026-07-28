@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle } from 'lucide-react';
+import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle, Trash2, Archive, Clock, DollarSign, TrendingUp, XCircle, Activity } from 'lucide-react';
 
 // ── Status Configuration ──────────────────────────────────────
 const ORDER_STATUSES = {
@@ -67,6 +67,7 @@ const filterBtnStyle = (active) => ({
 import { useLanguage } from '../context/LanguageContext';
 import AdminCategories from '../components/AdminCategories';
 import AdminProducts from '../components/AdminProducts';
+import AdminSauces from '../components/AdminSauces';
 
 export default function Admin() {
   const { language, t } = useLanguage();
@@ -79,8 +80,30 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [orderFilter, setOrderFilter] = useState('all');
+  const [archiveFilter, setArchiveFilter] = useState('all');
   const [resvFilter, setResvFilter] = useState('all');
   const [toast, setToast] = useState({ visible: false, message: '' });
+
+  const [salesAnalytics, setSalesAnalytics] = useState(() => {
+    try {
+      const saved = localStorage.getItem('salesAnalytics');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed) {
+        return {
+          totalRevenue: parsed.totalRevenue || 0,
+          completedOrdersCount: parsed.completedOrdersCount || 0,
+          cancelledOrdersCount: parsed.cancelledOrdersCount || 0,
+          cancelledRevenue: parsed.cancelledRevenue || 0,
+          processedOrders: parsed.processedOrders || {}
+        };
+      }
+    } catch {}
+    return { totalRevenue: 0, completedOrdersCount: 0, cancelledOrdersCount: 0, cancelledRevenue: 0, processedOrders: {} };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('salesAnalytics', JSON.stringify(salesAnalytics));
+  }, [salesAnalytics]);
 
   const showToast = (message) => {
     setToast({ visible: true, message });
@@ -113,6 +136,7 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      await fetch(`${API}/api/admin/orders/cleanup`, { method: 'DELETE' }).catch(() => {});
       const [ordersRes, resvRes, contactsRes, categoriesRes, productsRes] = await Promise.all([
         fetch(`${API}/api/admin/orders`),
         fetch(`${API}/api/admin/reservations`),
@@ -141,14 +165,93 @@ export default function Admin() {
         body: JSON.stringify({ status: newStatus })
       });
       if (response.ok) {
-        setData(prev => ({
-          ...prev,
-          orders: prev.orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
-        }));
+        setData(prev => {
+          const orderToUpdate = prev.orders.find(o => o.id === orderId);
+          if (orderToUpdate) {
+            setSalesAnalytics(s => {
+              let newTotalRev = s.totalRevenue;
+              let newCompletedCount = s.completedOrdersCount;
+              let newCancelledRev = s.cancelledRevenue;
+              let newCancelledCount = s.cancelledOrdersCount;
+              const newProcessed = { ...s.processedOrders };
+              const orderTotal = orderToUpdate.total || 0;
+
+              const previousStatus = newProcessed[orderId];
+
+              // Revert previous status if it was counted
+              if (previousStatus === 'completed') {
+                newTotalRev -= orderTotal;
+                newCompletedCount -= 1;
+                delete newProcessed[orderId];
+              } else if (previousStatus === 'cancelled') {
+                newCancelledRev -= orderTotal;
+                newCancelledCount -= 1;
+                delete newProcessed[orderId];
+              }
+
+              // Apply new status
+              if (newStatus === 'completed') {
+                newTotalRev += orderTotal;
+                newCompletedCount += 1;
+                newProcessed[orderId] = 'completed';
+              } else if (newStatus === 'cancelled') {
+                newCancelledRev += orderTotal;
+                newCancelledCount += 1;
+                newProcessed[orderId] = 'cancelled';
+              }
+
+              return {
+                totalRevenue: newTotalRev < 0 ? 0 : newTotalRev,
+                completedOrdersCount: newCompletedCount < 0 ? 0 : newCompletedCount,
+                cancelledRevenue: newCancelledRev < 0 ? 0 : newCancelledRev,
+                cancelledOrdersCount: newCancelledCount < 0 ? 0 : newCancelledCount,
+                processedOrders: newProcessed
+              };
+            });
+          }
+          return {
+            ...prev,
+            orders: prev.orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
+          };
+        });
         showToast(`Order #${orderId} → ${ORDER_STATUSES[newStatus]?.labelEn || newStatus}`);
       }
     } catch (err) {
       console.error('Failed to update order status', err);
+    }
+  };
+
+  const deleteOrder = async (orderId) => {
+    if (!window.confirm(isRTL ? 'هل أنت متأكد من حذف هذا الطلب نهائياً؟' : 'Are you sure you want to permanently delete this order?')) return;
+    try {
+      const response = await fetch(`${API}/api/admin/orders/${orderId}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          orders: prev.orders.filter(o => o.id !== orderId)
+        }));
+        showToast(`Order #${orderId} deleted permanently.`);
+      }
+    } catch (err) {
+      console.error('Failed to delete order', err);
+    }
+  };
+
+  const clearArchive = async () => {
+    if (!window.confirm(isRTL ? 'هل أنت متأكد من مسح جميع طلبات الأرشيف؟' : 'Are you sure you want to clear the entire archive?')) return;
+    try {
+      const response = await fetch(`${API}/api/admin/orders/archive`, { method: 'DELETE' });
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          orders: prev.orders.filter(o => !['completed', 'cancelled'].includes(o.status))
+        }));
+        showToast('Archive cleared successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to clear archive', err);
     }
   };
 
@@ -172,11 +275,16 @@ export default function Admin() {
   };
 
   // ── Filtered Data ─────────────────────────────────────────
+  const activeOrdersList = data.orders.filter(o => !['completed', 'cancelled'].includes(o.status));
+  const archivedOrdersList = data.orders.filter(o => ['completed', 'cancelled'].includes(o.status));
+
   const filteredOrders = orderFilter === 'all'
-    ? data.orders
-    : orderFilter === 'active'
-      ? data.orders.filter(o => !['completed', 'cancelled'].includes(o.status))
-      : data.orders.filter(o => o.status === orderFilter);
+    ? activeOrdersList
+    : activeOrdersList.filter(o => o.status === orderFilter);
+
+  const filteredArchivedOrders = archiveFilter === 'all'
+    ? archivedOrdersList
+    : archivedOrdersList.filter(o => o.status === archiveFilter);
 
   const filteredReservations = resvFilter === 'all'
     ? data.reservations
@@ -239,14 +347,61 @@ export default function Admin() {
       </header>
 
       <section className="section container">
+        {/* ── Financial Analytics Dashboard ────────────────────── */}
+        <div style={{ marginBottom: '2.5rem', backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--text-primary)' }}>
+              <TrendingUp size={24} color="var(--gold)" />
+              {isRTL ? 'التقارير المالية والمبيعات' : 'Financial Analytics Dashboard'}
+            </h2>
+            <button
+              onClick={() => {
+                if (window.confirm(isRTL ? 'هل أنت متأكد من تصفير الحسابات؟' : 'Are you sure you want to reset sales data?')) {
+                  setSalesAnalytics({ totalRevenue: 0, completedOrdersCount: 0, cancelledOrdersCount: 0, cancelledRevenue: 0, processedOrders: {} });
+                }
+              }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+            >
+              <RefreshCw size={16} /> {isRTL ? 'إعادة ضبط الحسابات' : 'Reset Sales Data'}
+            </button>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+            {/* Total Revenue */}
+            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(229,185,66,0.1)', border: '1px solid rgba(229,185,66,0.2)' }}>
+              <div style={{ color: 'var(--gold)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><DollarSign size={18} /> {isRTL ? 'إجمالي المبيعات' : 'Total Revenue'}</div>
+              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.totalRevenue} EGP</div>
+            </div>
+            {/* Completed Orders */}
+            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <div style={{ color: '#22C55E', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={18} /> {isRTL ? 'الطلبات الناجحة' : 'Successful Orders'}</div>
+              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.completedOrdersCount}</div>
+            </div>
+            {/* Cancelled Orders */}
+            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div style={{ color: '#EF4444', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><XCircle size={18} /> {isRTL ? 'الطلبات الملغاة' : 'Cancelled Orders'}</div>
+              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.cancelledOrdersCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>({salesAnalytics.cancelledRevenue} EGP)</span></div>
+            </div>
+            {/* Net Total Orders */}
+            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={18} /> {isRTL ? 'صافي الطلبات الإجمالي' : 'Net Total Orders'}</div>
+              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.completedOrdersCount + salesAnalytics.cancelledOrdersCount}</div>
+            </div>
+          </div>
+        </div>
+
         {/* ── Navigation Tabs ────────────────────────────────── */}
         <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', overflowX: 'auto' }}>
           {[
-            { key: 'orders', icon: <ShoppingBag size={20} />, label: isRTL ? 'الطلبات' : 'Orders', count: data.orders.length },
+            { key: 'orders', icon: <ShoppingBag size={20} />, label: isRTL ? 'الطلبات النشطة' : 'Active Orders', count: activeOrdersList.length },
+            { key: 'archive', icon: <Archive size={20} />, label: isRTL ? 'أرشيف الطلبات' : 'Archive', count: archivedOrdersList.length },
             { key: 'reservations', icon: <Calendar size={20} />, label: isRTL ? 'الحجوزات' : 'Reservations', count: data.reservations.length },
             { key: 'contacts', icon: <MessageSquare size={20} />, label: isRTL ? 'الرسائل' : 'Messages', count: data.contacts.length },
             { key: 'categories', icon: <Filter size={20} />, label: isRTL ? 'الأقسام' : 'Categories', count: data.categories.length },
             { key: 'products', icon: <ShoppingBag size={20} />, label: isRTL ? 'المنتجات' : 'Products', count: data.products.length },
+            { key: 'sauces', icon: <Edit2 size={20} />, label: isRTL ? 'الصوصات' : 'Sauces', count: '' },
           ].map(tab => (
             <button
               key={tab.key}
@@ -272,9 +427,9 @@ export default function Admin() {
             {/* Filter Bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
               <Filter size={16} color="var(--text-secondary)" />
-              {['all', 'active', 'pending', 'preparing', 'on_the_way', 'completed', 'cancelled'].map(f => (
+              {['all', 'pending', 'preparing', 'on_the_way'].map(f => (
                 <button key={f} onClick={() => setOrderFilter(f)} style={filterBtnStyle(orderFilter === f)}>
-                  {f === 'all' ? 'All' : f === 'active' ? '🔥 Active' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
+                  {f === 'all' ? 'All Active' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
                 </button>
               ))}
             </div>
@@ -291,7 +446,7 @@ export default function Admin() {
                     {/* Header Row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--gold)' }}>Order #{order.id}</span>
+                        <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--gold)' }}>Order #{order.daily_id || order.id}</span>
                         <StatusBadge status={order.status || 'pending'} config={ORDER_STATUSES} />
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                           {order.created_at ? new Date(order.created_at).toLocaleString() : '—'}
@@ -308,6 +463,27 @@ export default function Admin() {
                             <option key={val} value={val}>{cfg.emoji} {cfg.labelEn}</option>
                           ))}
                         </select>
+                        <button 
+                          onClick={() => deleteOrder(order.id)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: 'var(--brand-red)',
+                            borderRadius: '8px',
+                            padding: '0.4rem 0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'; e.currentTarget.style.color = '#fff' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = 'var(--brand-red)' }}
+                        >
+                          <Trash2 size={16} /> {isRTL ? 'حذف' : 'Delete'}
+                        </button>
                       </div>
                     </div>
 
@@ -333,9 +509,23 @@ export default function Admin() {
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items Ordered</h4>
                         <ul style={{ paddingLeft: '1.2rem', margin: 0 }}>
                           {Array.isArray(order.items) && order.items.map((item, i) => (
-                            <li key={i} style={{ marginBottom: '0.3rem', lineHeight: '1.5' }}>
-                              <span style={{ fontWeight: '700', color: 'var(--brand-red)' }}>{item.quantity}x</span> {item.name}
-                              <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>({item.price} EGP)</span>
+                            <li key={i} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>
+                              <div>
+                                <span style={{ fontWeight: '700', color: 'var(--brand-red)' }}>{item.quantity}x</span> {item.name}
+                                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>({item.price} EGP)</span>
+                              </div>
+                              {(item.selectedSpiciness || (item.selectedSauces && item.selectedSauces.length > 0)) && (
+                                <div style={{ display: 'flex', gap: '0.8rem', marginLeft: '1.5rem', marginTop: '0.2rem', fontSize: '0.85rem' }}>
+                                  {item.selectedSpiciness && (
+                                    <span style={{ color: item.selectedSpiciness === 'حار' ? '#EF4444' : 'var(--text-secondary)' }}>
+                                      {item.selectedSpiciness === 'حار' ? '🌶️' : '🧄'} {item.selectedSpiciness}
+                                    </span>
+                                  )}
+                                  {item.selectedSauces && item.selectedSauces.length > 0 && (
+                                    <span style={{ color: 'var(--gold)' }}>🧄 {item.selectedSauces.join('، ')}</span>
+                                  )}
+                                </div>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -349,6 +539,121 @@ export default function Admin() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            TAB: ARCHIVE MANAGEMENT
+            ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'archive' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <Filter size={16} color="var(--text-secondary)" />
+                {['all', 'completed', 'cancelled'].map(f => (
+                  <button key={f} onClick={() => setArchiveFilter(f)} style={filterBtnStyle(archiveFilter === f)}>
+                    {f === 'all' ? 'All Archived' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={clearArchive}
+                disabled={archivedOrdersList.length === 0}
+                style={{
+                  padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--brand-red)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--brand-red)', fontWeight: 'bold',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: archivedOrdersList.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: archivedOrdersList.length === 0 ? 0.5 : 1
+                }}
+              >
+                <Trash2 size={16} /> {isRTL ? 'مسح الأرشيف الآن' : 'Clear Archive Now'}
+              </button>
+            </div>
+
+            {filteredArchivedOrders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
+                <Archive size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                <p style={{ fontSize: '1.1rem' }}>No archived orders.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {filteredArchivedOrders.map(order => {
+                  const minutesArchived = order.archived_at ? Math.floor((Date.now() - order.archived_at) / (1000 * 60)) : 0;
+                  const minutesRemaining = 2 - minutesArchived;
+                  const accentColor = order.status === 'completed' ? 'var(--brand-green, #22C55E)' : 'var(--brand-red)';
+
+                  return (
+                    <div key={order.id} style={{ ...cardStyle, borderLeft: `4px solid ${accentColor}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Order #{order.daily_id || order.id}</span>
+                          <StatusBadge status={order.status} config={ORDER_STATUSES} />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <Clock size={14} /> 
+                            {isRTL ? `سيتم المسح التلقائي بعد ${minutesRemaining > 0 ? minutesRemaining : 0} دقيقة (وضع الاختبار)` : `Auto-delete in ${minutesRemaining > 0 ? minutesRemaining : 0}m (Test Mode)`}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Restore/Change:</span>
+                          <select
+                            value={order.status}
+                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                            style={selectStyle}
+                          >
+                            {Object.entries(ORDER_STATUSES).map(([val, cfg]) => (
+                              <option key={val} value={val}>{cfg.emoji} {cfg.labelEn}</option>
+                            ))}
+                          </select>
+                          <button 
+                            onClick={() => deleteOrder(order.id)}
+                            style={{
+                              background: 'transparent', border: 'none', color: 'var(--brand-red)',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 'bold', fontSize: '0.85rem',
+                              marginLeft: '0.5rem'
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', opacity: 0.8 }}>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: '600' }}>{order.address}</p>
+                          <p style={{ margin: '0.3rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>📞 {order.phone || '—'}</p>
+                        </div>
+                        <div>
+                          <ul style={{ paddingLeft: '1.2rem', margin: 0 }}>
+                            {Array.isArray(order.items) && order.items.map((item, i) => (
+                              <li key={i} style={{ marginBottom: '0.6rem', fontSize: '0.9rem' }}>
+                                <div>
+                                  <span style={{ fontWeight: '700' }}>{item.quantity}x</span> {item.name}
+                                </div>
+                                {(item.selectedSpiciness || (item.selectedSauces && item.selectedSauces.length > 0)) && (
+                                  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1.2rem', marginTop: '0.2rem', fontSize: '0.8rem', opacity: 0.8 }}>
+                                    {item.selectedSpiciness && (
+                                      <span style={{ color: item.selectedSpiciness === 'حار' ? '#EF4444' : 'var(--text-secondary)' }}>
+                                        {item.selectedSpiciness === 'حار' ? '🌶️' : '🧄'} {item.selectedSpiciness}
+                                      </span>
+                                    )}
+                                    {item.selectedSauces && item.selectedSauces.length > 0 && (
+                                      <span style={{ color: 'var(--gold)' }}>🧄 {item.selectedSauces.join('، ')}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end' }}>
+                          <span style={{ fontSize: '1.5rem', fontWeight: '900', color: accentColor }}>{order.total} EGP</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -463,6 +768,13 @@ export default function Admin() {
             ═══════════════════════════════════════════════════════ */}
         {activeTab === 'products' && (
           <AdminProducts products={data.products} categories={data.categories} fetchData={fetchData} API={API} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            TAB 6: SAUCES MANAGEMENT
+            ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'sauces' && (
+          <AdminSauces categories={data.categories} />
         )}
       </section>
     </div>

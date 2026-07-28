@@ -66,6 +66,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`, () => {
         db.run(`ALTER TABLE orders ADD COLUMN phone TEXT NOT NULL DEFAULT ''`, (err) => {});
         db.run(`ALTER TABLE orders ADD COLUMN notes TEXT DEFAULT ''`, (err) => {});
+        db.run(`ALTER TABLE orders ADD COLUMN archived_at INTEGER`, (err) => {
+          if (!err) console.log('Migrated orders table: added archived_at');
+        });
+        db.run(`ALTER TABLE orders ADD COLUMN daily_id INTEGER`, (err) => {
+          if (!err) console.log('Migrated orders table: added daily_id');
+        });
       });
 
       db.run(`CREATE TABLE IF NOT EXISTS categories (

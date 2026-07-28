@@ -192,7 +192,7 @@ const FloatingCart = () => {
   if (cartItemCount === 0 || location.pathname !== '/menu') return null;
 
   return (
-    <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+    <div className="flex flex-col items-end gap-2" style={{ position: 'fixed', right: '1.5rem', bottom: '12vh', zIndex: 50, pointerEvents: 'auto' }}>
       {/* CTA Label */}
       <div className="scale-in" style={{
         backgroundColor: 'var(--card-bg)',

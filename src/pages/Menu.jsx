@@ -5,17 +5,27 @@ import { X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { searchMenuItems } from '../utils/searchUtils';
 import OffersSlider from '../components/OffersSlider';
+import ProductModal from '../components/ProductModal';
 
 const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
 
 export default function Menu() {
-  const { addToCart } = useCart();
+  const { addToCart, openCheckout } = useCart();
   const { t, language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(null);
-  const [quantity, setQuantity] = useState(1);
   const [activeCategoryKey, setActiveCategoryKey] = useState("all");
   const [searchQuery, setSearchQuery] = useState('');
+  const [availableSauces, setAvailableSauces] = useState([]);
+  const [maxFreeSauces, setMaxFreeSauces] = useState(2);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('availableSauces');
+      if (saved) setAvailableSauces(JSON.parse(saved).filter(s => s.is_available));
+      const savedMax = localStorage.getItem('maxFreeSauces');
+      if (savedMax) setMaxFreeSauces(parseInt(savedMax, 10));
+    } catch {}
+  }, []);
 
   const [categoriesData, setCategoriesData] = useState([]);
   const [products, setProducts] = useState([]);
@@ -30,6 +40,19 @@ export default function Menu() {
   const getImageForKey = (key) => exactImageMap[key]
     ? `${import.meta.env.BASE_URL}Images/${exactImageMap[key]}`
     : null;
+
+  const getFallbackImageForCategory = (categoryKey) => {
+    switch(categoryKey) {
+      case 'shawarma': return 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?q=80&w=800';
+      case 'grills': return 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=800';
+      case 'appetizers': return 'https://images.unsplash.com/photo-1541518763669-27fef04b14e8?q=80&w=800';
+      case 'burgers': return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=800';
+      case 'pizza_pastries': return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=800';
+      case 'desserts': return 'https://images.unsplash.com/photo-1519676867240-f03562e64548?q=80&w=800';
+      case 'drinks': return 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?q=80&w=800';
+      default: return `${import.meta.env.BASE_URL}Images/31.png`;
+    }
+  };
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -57,7 +80,8 @@ export default function Menu() {
               id: p.id,
               name: language === 'ar' ? p.name_ar : p.name_en,
               desc: language === 'ar' ? p.desc_ar : p.desc_en,
-              img: p.img || getImageForKey(p.key),
+              category_key: cat.key,
+              img: p.img || getImageForKey(p.key) || getFallbackImageForCategory(cat.key),
               // Also normalise arrays
               sauces: Array.isArray(p.sauces) ? p.sauces : (typeof p.sauces === 'string' ? JSON.parse(p.sauces || '[]') : []),
               ingredients: Array.isArray(p.ingredients) ? p.ingredients : (typeof p.ingredients === 'string' ? JSON.parse(p.ingredients || '[]') : []),
@@ -67,7 +91,7 @@ export default function Menu() {
             key: cat.key,
             title: language === 'ar' ? cat.name_ar : cat.name_en,
             items: catItems,
-            img: getImageForKey(catItems[0]?.key) || `${import.meta.env.BASE_URL}Images/26.png`
+            img: getImageForKey(catItems[0]?.key) || getFallbackImageForCategory(cat.key)
           };
         });
 
@@ -95,21 +119,12 @@ export default function Menu() {
     const price = normalisePrice(item.price);
     const normItem = { ...item, price };
     setSelectedItem(normItem);
-    setQuantity(1);
-    if (typeof price === 'object' && price !== null) {
-      setSelectedSize(Object.keys(price)[0]);
-    } else {
-      setSelectedSize(null);
-    }
   };
 
-  const handleAddToCart = () => {
-    if (selectedItem) {
-      const priceToUse = selectedSize ? selectedItem.price[selectedSize] : selectedItem.price;
-      const nameToUse = selectedSize ? `${selectedItem.name} (${selectedSize})` : selectedItem.name;
-      addToCart({ ...selectedItem, name: nameToUse, price: priceToUse }, quantity);
-      setSelectedItem(null);
-    }
+  const handleAddToCart = (updatedItem, quantity) => {
+    addToCart(updatedItem, quantity);
+    setSelectedItem(null);
+    openCheckout();
   };
 
   const getDisplayPrice = (rawPrice) => {
@@ -121,17 +136,15 @@ export default function Menu() {
     return language === 'ar' ? `${price} ج.م` : `${price} EGP`;
   };
 
-  const currentModalPrice = selectedItem
-    ? (selectedSize ? selectedItem.price[selectedSize] : selectedItem.price)
-    : 0;
-
   const activeCategory = categoriesData.find(c => c.key === activeCategoryKey);
 
-  const allItemsFlattened = categoriesData.reduce((acc, cat) => {
+  const allItemsFlattened = (categoriesData || []).reduce((acc, cat) => {
     // Avoid duplicates if any exist
-    cat.items.forEach(item => {
-      if (!acc.find(i => i.id === item.id)) acc.push(item);
-    });
+    if (cat && cat.items) {
+      cat.items.forEach(item => {
+        if (!acc.find(i => i.id === item.id)) acc.push(item);
+      });
+    }
     return acc;
   }, []);
 
@@ -174,203 +187,134 @@ export default function Menu() {
         </div>
 
         {/* Loading State */}
-        {loading && (
+        {loading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gold)', fontSize: '1.2rem' }}>
+            <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--gold)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
             {language === 'ar' ? 'جاري تحميل القائمة...' : 'Loading Menu...'}
           </div>
-        )}
-
-        {/* Offers Slider (Only show when not searching and active category is all) */}
-        {!loading && !searchQuery && activeCategoryKey === 'all' && (
-          <OffersSlider products={products} onItemClick={handleOpenModal} />
-        )}
-
-        {searchQuery ? (
-          <div className="fade-in">
-            <h2 style={{ fontSize: '2rem', marginBottom: '2rem', color: 'var(--gold)', textAlign: 'center' }}>
-              {language === 'ar' ? 'نتائج البحث' : 'Search Results'}
-            </h2>
-            {searchResults.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '2rem' }}>
-                {searchResults.map((item, i) => (
-                  <div key={item.id || i} className={`fade-in stagger-${(i % 4) + 1}`} onClick={() => handleOpenModal(item)} style={{ backgroundColor: 'var(--card-bg)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer', opacity: 0 }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(200, 16, 46, 0.3)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
-                    <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem' }}>
-                      <img
-                        src={item.img || `${import.meta.env.BASE_URL}Images/31.png`}
-                        alt={item.name}
-                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
-                        onError={(e) => { e.target.src = `${import.meta.env.BASE_URL}Images/31.png`; }}
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-                        <h3 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>{item.name}</h3>
-                        <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-red)' }}>{getDisplayPrice(item.price)}</span>
-                        <p style={{ color: 'var(--text-secondary)', margin: 0, fontWeight: 500, fontSize: '0.95rem', lineHeight: '1.5' }}>{item.desc}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
-                {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
-              </p>
-            )}
-          </div>
-        ) : activeCategoryKey === "all" ? (
-          /* Category Grid View */
-          <div>
-            <h2 style={{ fontSize: '2rem', marginBottom: '2rem', color: 'var(--text-primary)', textAlign: 'center' }}>
-              {language === 'ar' ? 'اختر القسم' : 'Select a Category'}
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '2rem' }}>
-              {categoriesData.map((cat) => (
-                <div
-                  key={cat.key}
-                  onClick={() => setActiveCategoryKey(cat.key)}
-                  style={{
-                    position: 'relative',
-                    height: '250px',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-                    border: '2px solid var(--border-color)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-10px)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-                >
-                  <img src={cat.img} alt={cat.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2))', display: 'flex', alignItems: 'flex-end', padding: '2rem' }}>
-                    <h3 style={{ color: 'var(--gold)', fontSize: '2.2rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{cat.title}</h3>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         ) : (
-          /* Items View for Selected Category */
-          <div className="fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '2px solid var(--brand-red)', paddingBottom: '1rem' }}>
-              <button
-                onClick={() => setActiveCategoryKey("all")}
-                className="btn-outline back-to-cat-btn"
-                style={{ padding: '0.5rem 1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <X size={20} />
-                {language === 'ar' ? 'العودة للأقسام' : 'Back to Categories'}
-              </button>
-              <h2 style={{ fontSize: '2.5rem', margin: 0, color: 'var(--gold)' }}>{activeCategory?.title}</h2>
-            </div>
+          <>
+            {/* Offers Slider (Only show when not searching and active category is all) */}
+            {!searchQuery && activeCategoryKey === 'all' && (
+              <OffersSlider products={products} onItemClick={handleOpenModal} />
+            )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '2rem' }}>
-              {activeCategory?.items.map((item, i) => (
-                <div key={item.id || i} className={`fade-in stagger-${(i % 4) + 1}`} onClick={() => handleOpenModal(item)} style={{ backgroundColor: 'var(--card-bg)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer', opacity: 0 }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(200, 16, 46, 0.3)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
-                  <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem' }}>
-                    <img
-                      src={item.img || `${import.meta.env.BASE_URL}Images/31.png`}
-                      alt={item.name}
-                      style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
-                      onError={(e) => { e.target.src = `${import.meta.env.BASE_URL}Images/31.png`; }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-                      <h3 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>{item.name}</h3>
-                      <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-red)' }}>{getDisplayPrice(item.price)}</span>
-                      <p style={{ color: 'var(--text-secondary)', margin: 0, fontWeight: 500, fontSize: '0.95rem', lineHeight: '1.5' }}>{item.desc}</p>
-                    </div>
+            {searchQuery ? (
+              <div className="fade-in">
+                <h2 style={{ fontSize: '2rem', marginBottom: '2rem', color: 'var(--gold)', textAlign: 'center' }}>
+                  {language === 'ar' ? 'نتائج البحث' : 'Search Results'}
+                </h2>
+                {searchResults.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '2rem' }}>
+                    {searchResults.map((item, i) => (
+                      <div key={item.id || i} className={`fade-in stagger-${(i % 4) + 1}`} onClick={() => handleOpenModal(item)} style={{ backgroundColor: 'var(--card-bg)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer', opacity: 0 }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(200, 16, 46, 0.3)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
+                        <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem' }}>
+                          <img
+                            loading="lazy"
+                            src={item.img || getFallbackImageForCategory(item.category_key)}
+                            alt={item.name}
+                            style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+                            onError={(e) => { e.target.src = getFallbackImageForCategory(item.category_key); }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+                            <h3 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>{item.name}</h3>
+                            <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-red)' }}>{getDisplayPrice(item.price)}</span>
+                            <p style={{ color: 'var(--text-secondary)', margin: 0, fontWeight: 500, fontSize: '0.95rem', lineHeight: '1.5' }}>{item.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Add to Cart Modal with React Portal */}
-      {selectedItem && typeof document !== 'undefined' && createPortal(
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px', position: 'relative', border: '2px solid var(--brand-red)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.8)' }}>
-            <button onClick={() => setSelectedItem(null)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.3s' }} onMouseEnter={e => e.currentTarget.style.color = 'var(--brand-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
-              <X size={28} />
-            </button>
-
-            <h2 style={{ marginBottom: '0.5rem', color: 'var(--gold)', fontSize: '2rem' }}>{selectedItem.name}</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '1.1rem' }}>{selectedItem.desc}</p>
-
-            {/* Additional Info (Weight, Ingredients, Sauces) */}
-            {(selectedItem.weight || (selectedItem.ingredients && selectedItem.ingredients.length > 0) || (selectedItem.sauces && selectedItem.sauces.length > 0)) && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                {selectedItem.weight && (
-                  <p style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-                    <strong style={{ color: 'var(--gold)' }}>{language === 'ar' ? 'الوزن/الحجم:' : 'Weight/Size:'}</strong> {selectedItem.weight}
+                ) : (
+                  <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
+                    {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
                   </p>
                 )}
-                {selectedItem.ingredients && selectedItem.ingredients.length > 0 && (
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>{language === 'ar' ? 'المكونات:' : 'Ingredients:'}</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      {selectedItem.ingredients.map((ing, idx) => (
-                        <span key={idx} style={{ padding: '4px 10px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '20px', fontSize: '0.85rem' }}>{ing}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {selectedItem.sauces && selectedItem.sauces.length > 0 && (
-                  <div>
-                    <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>{language === 'ar' ? 'الصوصات المتوفرة:' : 'Included Sauces:'}</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      {selectedItem.sauces.map((sauce, idx) => (
-                        <span key={idx} style={{ padding: '4px 10px', backgroundColor: 'rgba(229,185,66,0.1)', color: 'var(--gold)', borderRadius: '20px', fontSize: '0.85rem' }}>{sauce}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
+            ) : activeCategoryKey === "all" ? (
+              /* Category Grid View */
+              <div>
+                <h2 style={{ fontSize: '2rem', marginBottom: '2rem', color: 'var(--text-primary)', textAlign: 'center' }}>
+                  {language === 'ar' ? 'اختر القسم' : 'Select a Category'}
+                </h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '2rem' }}>
+                  {categoriesData?.map((cat) => (
+                    <div
+                      key={cat.key}
+                      onClick={() => setActiveCategoryKey(cat.key)}
+                      style={{
+                        position: 'relative',
+                        height: '250px',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                        border: '2px solid var(--border-color)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-10px)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                    >
+                      <img loading="lazy" src={cat.img || getFallbackImageForCategory(cat.key)} alt={cat.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = getFallbackImageForCategory(cat.key); }} />
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2))', display: 'flex', alignItems: 'flex-end', padding: '2rem' }}>
+                        <h3 style={{ color: 'var(--gold)', fontSize: '2.2rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{cat.title}</h3>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Items View for Selected Category */
+              <div className="fade-in">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '2px solid var(--brand-red)', paddingBottom: '1rem' }}>
+                  <button
+                    onClick={() => setActiveCategoryKey("all")}
+                    className="btn-outline back-to-cat-btn"
+                    style={{ padding: '0.5rem 1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <X size={20} />
+                    {language === 'ar' ? 'العودة للأقسام' : 'Back to Categories'}
+                  </button>
+                  <h2 style={{ fontSize: '2.5rem', margin: 0, color: 'var(--gold)' }}>{activeCategory?.title}</h2>
+                </div>
 
-            {/* Size Selector */}
-            {typeof selectedItem.price === 'object' && (
-              <div style={{ marginBottom: '2rem' }}>
-                <h4 style={{ color: 'var(--text-primary)', marginBottom: '1rem' }}>{language === 'ar' ? 'اختر الحجم أو النوع:' : 'Select Size/Option:'}</h4>
-                <div style={{ display: 'grid', gap: '0.8rem' }}>
-                  {Object.keys(selectedItem.price).map(sizeKey => (
-                    <label key={sizeKey} style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', padding: '0.8rem', border: '1px solid', borderColor: selectedSize === sizeKey ? 'var(--gold)' : 'var(--border-color)', borderRadius: '8px', backgroundColor: selectedSize === sizeKey ? 'rgba(212, 175, 55, 0.1)' : 'transparent', transition: 'all 0.2s' }}>
-                      <input
-                        type="radio"
-                        name="itemSize"
-                        value={sizeKey}
-                        checked={selectedSize === sizeKey}
-                        onChange={() => setSelectedSize(sizeKey)}
-                        style={{ accentColor: 'var(--gold)', transform: 'scale(1.2)' }}
-                      />
-                      <span style={{ fontSize: '1.1rem', flex: 1 }}>{sizeKey}</span>
-                      <span style={{ fontWeight: 'bold', color: 'var(--gold)' }}>{language === 'ar' ? `${selectedItem.price[sizeKey]} ج.م` : `${selectedItem.price[sizeKey]} EGP`}</span>
-                    </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '2rem' }}>
+                  {activeCategory?.items?.map((item, i) => (
+                    <div key={item.id || i} className={`fade-in stagger-${(i % 4) + 1}`} onClick={() => handleOpenModal(item)} style={{ backgroundColor: 'var(--card-bg)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, box-shadow 0.3s ease', cursor: 'pointer', opacity: 0 }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(200, 16, 46, 0.3)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
+                      <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem' }}>
+                        <img
+                          loading="lazy"
+                          src={item.img || getFallbackImageForCategory(item.category_key)}
+                          alt={item.name}
+                          style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+                          onError={(e) => { e.target.src = getFallbackImageForCategory(item.category_key); }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+                          <h3 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>{item.name}</h3>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-red)' }}>{getDisplayPrice(item.price)}</span>
+                          <p style={{ color: 'var(--text-secondary)', margin: 0, fontWeight: 500, fontSize: '0.95rem', lineHeight: '1.5' }}>{item.desc}</p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
+          </>
+        )}
+      </section>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', marginTop: typeof selectedItem.price === 'object' ? '2rem' : '0', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-              <div>
-                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.2rem' }}>{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
-                <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--gold)' }}>
-                  {language === 'ar' ? `${currentModalPrice * quantity} ج.م` : `${currentModalPrice * quantity} EGP`}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--brand-red)', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                <span style={{ fontSize: '1.4rem', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)} style={{ width: '40px', height: '40px', fontSize: '1.5rem', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--brand-red)', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-              </div>
-            </div>
-
-            <button onClick={handleAddToCart} className="btn-primary" style={{ width: '100%', padding: '1.2rem', fontSize: '1.2rem' }}>
-              {language === 'ar' ? 'إضافة إلى الطلب' : 'Add to Order'}
-            </button>
-          </div>
-        </div>,
-        document.body
+      {/* Add to Cart Modal with React Portal */}
+      {selectedItem && (
+        <ProductModal 
+          item={selectedItem}
+          categoriesData={categoriesData}
+          availableSauces={availableSauces}
+          maxFreeSauces={maxFreeSauces}
+          onClose={() => setSelectedItem(null)}
+          onSave={handleAddToCart}
+          isEditMode={false}
+        />
       )}
     </div>
   );

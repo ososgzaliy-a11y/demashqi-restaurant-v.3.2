@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X } from 'lucide-react';
+import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2 } from 'lucide-react';
+import ProductModal from '../components/ProductModal';
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
   if (!isOpen) return null;
@@ -92,6 +93,19 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
     const addressStr = addressParts.join(', ');
 
+    const today = new Date().toISOString().split('T')[0];
+    let lastDate = localStorage.getItem('lastOrderDate');
+    let dailyCounter = parseInt(localStorage.getItem('dailyOrderCounter') || '0', 10);
+    
+    if (lastDate !== today) {
+      dailyCounter = 1;
+      localStorage.setItem('lastOrderDate', today);
+    } else {
+      dailyCounter += 1;
+    }
+    localStorage.setItem('dailyOrderCounter', dailyCounter.toString());
+    const dailyOrderId = dailyCounter;
+
     try {
       const response = await fetch(`http://${window.location.hostname}:3000/api/orders`, {
         method: 'POST',
@@ -102,7 +116,8 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           address: addressStr,
           phone: formData.phone,
           notes: formData.notes,
-          paymentMethod: formData.paymentMethod
+          paymentMethod: formData.paymentMethod,
+          daily_id: dailyOrderId
         })
       });
 
@@ -148,6 +163,20 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
   };
 
   const labelStyle = { fontWeight: 600, color: 'var(--text-secondary)' };
+
+  useEffect(() => {
+    if (status.type === 'success') {
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = '0px';
+    } else {
+      document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
+    };
+  }, [status.type]);
 
   return (
     <form onSubmit={handleCheckout} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -234,23 +263,71 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
         )}
       </div>
 
-      <button type="submit" className="btn-primary" style={{ padding: '1.5rem', fontSize: '1.2rem', borderRadius: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '1rem' }} disabled={status.type === 'loading'}>
-        {status.type === 'loading' ? t.processing : t.confirmBtn}
-      </button>
+      {status.type !== 'success' && (
+        <button type="submit" className="btn-primary" style={{ padding: '1.5rem', fontSize: '1.2rem', borderRadius: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '1rem' }} disabled={status.type === 'loading'}>
+          {status.type === 'loading' ? t.processing : t.confirmBtn}
+        </button>
+      )}
 
-      {status.message && (
-        <div className="scale-in" style={{ padding: '1.5rem', marginTop: '1rem', borderRadius: '8px', backgroundColor: status.type === 'success' ? 'rgba(46, 204, 113, 0.1)' : 'rgba(200, 16, 46, 0.1)', color: status.type === 'success' ? '#2ecc71' : 'var(--brand-red)', border: `1px solid ${status.type === 'success' ? '#2ecc71' : 'var(--brand-red)'}`, textAlign: 'center', fontWeight: 'bold' }}>
+      {status.type === 'error' && (
+        <div className="scale-in" style={{ padding: '1.5rem', marginTop: '1rem', borderRadius: '8px', backgroundColor: 'rgba(200, 16, 46, 0.1)', color: 'var(--brand-red)', border: '1px solid var(--brand-red)', textAlign: 'center', fontWeight: 'bold' }}>
           <div>{status.message}</div>
-          {status.orderId && (
+        </div>
+      )}
+
+      {status.type === 'success' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '1rem' }}>
+          <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '3rem 2rem', borderRadius: '16px', border: '1px solid #2ecc71', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)', position: 'relative', margin: 'auto' }}>
             <button
               type="button"
-              onClick={() => navigate(`/track?id=${status.orderId}`)}
-              className="btn-primary"
-              style={{ marginTop: '1rem', padding: '0.8rem 1.8rem', borderRadius: '50px', fontSize: '1rem' }}
+              onClick={() => {
+                document.body.style.overflow = 'unset';
+                if (onClose) onClose();
+                clearCart();
+                if (setStatus) setStatus({ type: '', message: '' });
+                navigate('/menu');
+              }}
+              style={{ position: 'absolute', top: '15px', left: language === 'ar' ? '15px' : 'auto', right: language === 'ar' ? 'auto' : '15px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', transition: 'color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
             >
-              {t.trackOrder(status.orderId)}
+              <X size={24} />
             </button>
-          )}
+            <CheckCircle size={64} color="#2ecc71" style={{ marginBottom: '1.5rem', display: 'inline-block' }} />
+            <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '2rem' }}>{language === 'ar' ? 'تم تأكيد الطلب بنجاح' : 'Order Confirmed'}</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {status.orderId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.body.style.overflow = 'unset';
+                    if (onClose) onClose();
+                    navigate(`/track?id=${status.orderId}`);
+                  }}
+                  className="btn-primary"
+                  style={{ padding: '1rem 2rem', borderRadius: '50px', fontSize: '1.1rem', width: '100%', backgroundColor: '#2ecc71', border: 'none', cursor: 'pointer' }}
+                >
+                  {t.trackOrder(status.orderId)}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  document.body.style.overflow = 'unset';
+                  if (onClose) onClose();
+                  clearCart();
+                  if (setStatus) setStatus({ type: '', message: '' });
+                  navigate('/menu');
+                }}
+                style={{ padding: '1rem 2rem', borderRadius: '50px', fontSize: '1.1rem', width: '100%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'var(--text-secondary)' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'var(--border-color)' }}
+              >
+                {language === 'ar' ? 'العودة للقائمة الرئيسية' : 'Back to Menu'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -269,9 +346,63 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 }
 
 export default function Checkout({ isModal = false, onClose }) {
-  const { cart, cartTotal, clearCart } = useCart();
+  const { cart, cartTotal, clearCart, updateQuantity, updateCartItem, removeFromCart } = useCart();
   const navigate = useNavigate();
   const { language } = useLanguage();
+
+  const [editingCartItem, setEditingCartItem] = useState(null);
+  const [availableSauces, setAvailableSauces] = useState([]);
+  const [maxFreeSauces, setMaxFreeSauces] = useState(2);
+
+  useEffect(() => {
+    try {
+      const savedSauces = localStorage.getItem('availableSauces');
+      if (savedSauces) setAvailableSauces(JSON.parse(savedSauces).filter(s => s.is_available));
+      const savedMax = localStorage.getItem('maxFreeSauces');
+      if (savedMax) setMaxFreeSauces(parseInt(savedMax, 10));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModal && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isModal, onClose]);
+
+  useEffect(() => {
+    if (isModal) {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = '0px';
+      const rootEl = document.getElementById('root');
+      if (rootEl) rootEl.style.overflow = 'hidden';
+    } else {
+      document.documentElement.style.overflow = 'unset';
+      document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
+      const rootEl = document.getElementById('root');
+      if (rootEl) rootEl.style.overflow = 'unset';
+    }
+    return () => {
+      document.documentElement.style.overflow = 'unset';
+      document.body.style.overflow = 'unset';
+      document.body.style.paddingRight = '0px';
+      const rootEl = document.getElementById('root');
+      if (rootEl) rootEl.style.overflow = 'unset';
+    };
+  }, [isModal]);
+
+  const [toastMessage, setToastMessage] = useState('');
+
+  const handleRemoveItem = (itemId) => {
+    removeFromCart(itemId);
+    setToastMessage(language === 'ar' ? 'تم حذف المنتج من السلة 🗑️' : 'Item removed from cart 🗑️');
+    setTimeout(() => setToastMessage(''), 2000);
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -293,7 +424,10 @@ export default function Checkout({ isModal = false, onClose }) {
       <p style={{ marginBottom: '2.5rem', color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
         {language === 'ar' ? 'لم تضف أي عناصر إلى طلبك بعد.' : "Looks like you haven't added anything to your order yet."}
       </p>
-      <button onClick={() => { if (isModal && onClose) onClose(); else navigate('/menu'); }} className="btn-primary" style={{ padding: '1rem 3rem', borderRadius: '50px' }}>
+      <button onClick={() => { 
+        if (isModal && onClose) onClose(); 
+        navigate('/menu'); 
+      }} className="btn-primary" style={{ padding: '1rem 3rem', borderRadius: '50px' }}>
         {language === 'ar' ? 'استكشف القائمة' : 'Explore Menu'}
       </button>
     </div>
@@ -303,17 +437,6 @@ export default function Checkout({ isModal = false, onClose }) {
     <div className="fade-in">
       {/* Header */}
       <div style={{ backgroundColor: 'var(--card-bg)', padding: isModal ? '2rem 0' : '8rem 0 3rem', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
-        {isModal && onClose && (
-          <button onClick={onClose} style={{
-            position: 'absolute', top: '1rem', right: '2rem', background: 'var(--bg-color)', border: '1px solid var(--border-color)', color: 'var(--brand-red)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
-            transition: 'transform 0.2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
-          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <X size={20} />
-          </button>
-        )}
         <div className="container" style={{ textAlign: 'center' }}>
           <h1 style={{ fontSize: 'clamp(2rem, 6vw, 3.5rem)', marginBottom: '1rem' }}>
             {language === 'ar' ? 'الدفع الآمن' : 'Secure Checkout'}
@@ -323,13 +446,6 @@ export default function Checkout({ isModal = false, onClose }) {
           </p>
         </div>
       </div>
-      {isModal && onClose && (
-        <div style={{ textAlign: 'center', padding: '0.6rem 0 0.2rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '0.95rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
-            ← {language === 'ar' ? 'رجوع لإكمال التسوق' : 'Back to Shopping'}
-          </button>
-        </div>
-      )}
 
       <section className="section container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '3rem', padding: '3rem 0' }}>
 
@@ -344,12 +460,75 @@ export default function Checkout({ isModal = false, onClose }) {
               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div>
                   <h4 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '0.3rem' }}>{item.name}</h4>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
-                    {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.5rem' }}>
+                    {item.selectedSpiciness && (
+                      <span style={{ color: item.selectedSpiciness === 'حار' ? 'var(--brand-red)' : 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        🌶️ {language === 'ar' ? `الطعم: ${item.selectedSpiciness}` : `Spiciness: ${item.selectedSpiciness}`}
+                      </span>
+                    )}
+                    {item.selectedSauces && item.selectedSauces.length > 0 && (
+                      <div style={{ color: 'var(--gold)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column' }}>
+                        <span>🧄 {language === 'ar' ? `الصوصات: ${item.selectedSauces.join('، ')}` : `Sauces: ${item.selectedSauces.join(', ')}`}</span>
+                        {item.extraSaucePrice > 0 && (
+                          <span style={{ color: 'var(--brand-red)', marginTop: '0.2rem' }}>
+                            {language === 'ar' ? `إضافات: صوص إضافي (+${item.extraSaucePrice} ج.م)` : `Additions: Extra Sauce (+${item.extraSaucePrice} EGP)`}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <button 
+                        onClick={() => {
+                          if (item.quantity <= 1) {
+                            handleRemoveItem(item.cartItemId);
+                          } else {
+                            updateQuantity(item.cartItemId, item.quantity - 1);
+                          }
+                        }}
+                        style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                      <span style={{ fontSize: '1rem', fontWeight: 'bold' }}>{item.quantity}</span>
+                      <button 
+                        onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                        style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    </div>
+                    <button 
+                      onClick={() => setEditingCartItem(item)}
+                      style={{ background: 'none', border: 'none', color: 'var(--brand-red)', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Edit2 size={14} /> {language === 'ar' ? 'تعديل' : 'Edit'}
+                    </button>
+                    <button 
+                      onClick={() => handleRemoveItem(item.cartItemId)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'color 0.2s' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--brand-red)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      <Trash2 size={14} /> {language === 'ar' ? 'حذف' : 'Remove'}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--gold)' }}>
-                  {item.price}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  {(() => {
+                    const basePriceVal = parseInt(item.price?.toString().match(/(\d+)/)?.[0] || 0);
+                    const extras = item.extraSaucePrice || 0;
+                    const total = (basePriceVal + extras) * item.quantity;
+                    
+                    return (
+                      <>
+                        <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--gold)' }}>
+                          {language === 'ar' ? `${total} ج.م` : `${total} EGP`}
+                        </div>
+                        {(extras > 0 || item.quantity > 1) && (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem', direction: 'ltr' }}>
+                            {extras > 0 
+                              ? `(${basePriceVal} + ${extras}) × ${item.quantity}` 
+                              : `${basePriceVal} × ${item.quantity}`}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -372,24 +551,110 @@ export default function Checkout({ isModal = false, onClose }) {
             clearCart={clearCart}
             navigate={navigate}
             language={language}
+            onClose={onClose}
           />
         </div>
       </section>
+
+      {editingCartItem && (
+        <ProductModal 
+          item={editingCartItem}
+          categoriesData={[]} 
+          availableSauces={availableSauces}
+          maxFreeSauces={maxFreeSauces}
+          onClose={() => setEditingCartItem(null)}
+          onSave={(updatedItem, qty) => {
+            updateCartItem(editingCartItem.cartItemId, { ...updatedItem, quantity: qty });
+            setEditingCartItem(null);
+          }}
+          isEditMode={true}
+        />
+      )}
     </div>
   );
 
   if (isModal) {
     return (
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        backgroundColor: 'var(--bg-color)', overflowY: 'auto',
-        animation: 'slideUpFull 0.35s cubic-bezier(0.4,0,0.2,1)',
-      }}>
-        {cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent}
+      <div 
+        onClick={onClose}
+        onWheel={(e) => e.preventDefault()}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          backdropFilter: 'blur(4px)',
+          display: 'flex', 
+          justifyContent: language === 'ar' ? 'flex-start' : 'flex-end',
+          animation: 'fadeIn 0.3s ease',
+          touchAction: 'none'
+        }}>
+        <div 
+          onClick={e => e.stopPropagation()}
+          className="cart-scroll-container overscroll-contain"
+          style={{
+            backgroundColor: 'var(--bg-color)', 
+            width: '100%', 
+            maxWidth: '600px', 
+            height: '100%',
+            overflowY: 'auto',
+            animation: language === 'ar' ? 'slideInLeft 0.35s cubic-bezier(0.4,0,0.2,1)' : 'slideInRight 0.35s cubic-bezier(0.4,0,0.2,1)',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+          
+          {/* Universal Drawer Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)', position: 'sticky', top: 0, zIndex: 10 }}>
+            <h2 style={{ margin: 0, color: 'var(--gold)', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShoppingBag size={24} />
+              {language === 'ar' ? 'سلة الطلبات' : 'Your Cart'}
+            </h2>
+            <button onClick={onClose} style={{
+              background: 'var(--bg-color)', border: '1px solid var(--border-color)', color: 'var(--brand-red)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            {cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent}
+          </div>
+        </div>
+        
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: 'var(--brand-red)',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 10000,
+            animation: 'toastSlideIn 0.3s cubic-bezier(0.4,0,0.2,1)'
+          }}>
+            {toastMessage}
+          </div>
+        )}
+
         <style>{`
-          @keyframes slideUpFull {
-            from { transform: translateY(100%); opacity: 0; }
-            to   { transform: translateY(0);    opacity: 1; }
+          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+          }
+          @keyframes slideInLeft {
+            from { transform: translateX(-100%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+          }
+          @keyframes toastSlideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to   { transform: translateX(0); opacity: 1; }
           }
         `}</style>
       </div>
