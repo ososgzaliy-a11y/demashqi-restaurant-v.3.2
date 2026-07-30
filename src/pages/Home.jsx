@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, Phone, Tag } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useCart } from '../context/CartContext';
+import ProductModal from '../components/ProductModal';
 
 // Import authentic images
 import HeroImage from '../../Images/1.jpeg';
@@ -13,12 +15,15 @@ import OffersSlider from '../components/OffersSlider';
 
 export default function Home() {
   const { t, language } = useLanguage();
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const { addToCart } = useCart();
   const [offers, setOffers] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   useEffect(() => {
     const fetchOffers = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:3000/api/products`);
+        const res = await fetch(`${API}/api/products`);
         if (res.ok) {
           const allProds = await res.json();
           // Filter products for offers (daily, weekly, or fallback to popular)
@@ -82,7 +87,7 @@ export default function Home() {
               </h2>
             </div>
 
-            <OffersSlider items={offers} title={null} />
+            <OffersSlider items={offers} title={null} onItemClick={setSelectedProduct} />
           </div>
         </section>
       )}
@@ -135,23 +140,35 @@ export default function Home() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 'clamp(1.5rem, 4vw, 2rem)' }}>
             {[
-              { name: t('featured.dish1.name'), desc: t('featured.dish1.desc'), price: "£60", img: Dish1Image },
-              { name: t('featured.dish2.name'), desc: t('featured.dish2.desc'), price: "£180", img: Dish2Image },
-              { name: t('featured.dish3.name'), desc: t('featured.dish3.desc'), price: "£90", img: Dish3Image }
+              { id: 'feat-1', name_en: t('featured.dish1.name'), name_ar: t('featured.dish1.name'), desc_en: t('featured.dish1.desc'), desc_ar: t('featured.dish1.desc'), price: 60, displayPrice: '£60', img: Dish1Image, category_key: 'featured' },
+              { id: 'feat-2', name_en: t('featured.dish2.name'), name_ar: t('featured.dish2.name'), desc_en: t('featured.dish2.desc'), desc_ar: t('featured.dish2.desc'), price: 180, displayPrice: '£180', img: Dish2Image, category_key: 'featured' },
+              { id: 'feat-3', name_en: t('featured.dish3.name'), name_ar: t('featured.dish3.name'), desc_en: t('featured.dish3.desc'), desc_ar: t('featured.dish3.desc'), price: 90, displayPrice: '£90', img: Dish3Image, category_key: 'featured' }
             ].map((dish, i) => (
               <div
                 key={i}
+                onClick={() => setSelectedProduct(dish)}
                 style={{ backgroundColor: 'var(--bg-color)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', transition: 'transform 0.4s ease', cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-8px)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                <img src={dish.img} alt={dish.name} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+                <img src={dish.img} alt={language === 'ar' ? dish.name_ar : dish.name_en} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-                    <h3 style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.5rem)', margin: 0 }}>{dish.name}</h3>
-                    <span style={{ color: 'var(--gold)', fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0, marginLeft: '0.5rem' }}>{dish.price}</span>
+                    <h3 style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.5rem)', margin: 0 }}>{language === 'ar' ? dish.name_ar : dish.name_en}</h3>
+                    <span style={{ color: 'var(--gold)', fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0, marginLeft: '0.5rem' }}>{dish.displayPrice}</span>
                   </div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{dish.desc}</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>{language === 'ar' ? dish.desc_ar : dish.desc_en}</p>
+                  
+                  <button
+                    className="order-btn"
+                    style={{ width: '100%', marginTop: '0.5rem' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProduct(dish);
+                    }}
+                  >
+                    {language === 'ar' ? 'اطلب الآن' : 'Order Now'}
+                  </button>
                 </div>
               </div>
             ))}
@@ -164,6 +181,16 @@ export default function Home() {
 
 
 
+    {selectedProduct && (
+      <ProductModal
+        item={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onSave={(cartItem, qty) => {
+          addToCart(cartItem, qty);
+          setSelectedProduct(null);
+        }}
+      />
+    )}
     </div>
   );
 }

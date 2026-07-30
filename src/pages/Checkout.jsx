@@ -1,14 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2 } from 'lucide-react';
 import ProductModal from '../components/ProductModal';
+import RecommendationsModal from '../components/RecommendationsModal';
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
+  useEffect(() => {
+    if (isOpen) {
+      // منع سكرول الخلفية أثناء ظهور التنبيه
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+  
+  const modalContent = (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', overflow: 'hidden' }}>
       <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem', borderRadius: '16px', border: '1px solid var(--border-color)', maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
         <AlertTriangle size={48} color="var(--gold)" style={{ marginBottom: '1.5rem' }} />
         <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '1rem' }}>{title}</h2>
@@ -24,11 +37,20 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, messa
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
-function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatus, clearCart, navigate, language }) {
+function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatus, clearCart, navigate, language, onClose: closeCart }) {
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmCountdown, setConfirmCountdown] = useState(5);
+  const [isSubmittingState, setIsSubmittingState] = useState(false);
+  const isSubmittingRef = React.useRef(false);
+
+  const closeSuccessModal = () => {
+    if (setStatus) setStatus({ type: '', message: '' });
+  };
 
   useEffect(() => {
     let timer;
@@ -86,6 +108,10 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
   };
 
   const proceedCheckout = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmittingState(true);
+    
     setShowConfirmModal(false);
     setStatus({ type: 'loading', message: t.processing });
     let addressParts = [formData.street];
@@ -93,27 +119,20 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
     const addressStr = addressParts.join(', ');
 
-    const today = new Date().toISOString().split('T')[0];
-    let lastDate = localStorage.getItem('lastOrderDate');
-    let dailyCounter = parseInt(localStorage.getItem('dailyOrderCounter') || '0', 10);
-    
-    if (lastDate !== today) {
-      dailyCounter = 1;
-      localStorage.setItem('lastOrderDate', today);
-    } else {
-      dailyCounter += 1;
-    }
-    localStorage.setItem('dailyOrderCounter', dailyCounter.toString());
-    const dailyOrderId = dailyCounter;
+    let globalCounter = parseInt(localStorage.getItem('globalOrderCounter') || '7023', 10);
+    globalCounter += 1;
+    localStorage.setItem('globalOrderCounter', globalCounter.toString());
+    const dailyOrderId = globalCounter;
 
     try {
-      const response = await fetch(`http://${window.location.hostname}:3000/api/orders`, {
+      const response = await fetch(`${API}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: cart,
           total: cartTotal,
           address: addressStr,
+          name: formData.name,
           phone: formData.phone,
           notes: formData.notes,
           paymentMethod: formData.paymentMethod,
@@ -124,10 +143,10 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
       const data = await response.json();
 
       if (response.ok) {
-        setStatus({
-          type: 'success',
-          orderId: data.id,
-          message: language === 'ar' ? `تم تأكيد الطلب #${data.id} بنجاح!` : `Order #${data.id} placed securely!`
+        setStatus({ 
+          type: 'success', 
+          message: language === 'ar' ? `تم تأكيد الطلب #${dailyOrderId} بنجاح!` : `Order #${dailyOrderId} placed securely!`,
+          orderId: dailyOrderId 
         });
         clearCart();
       } else {
@@ -136,6 +155,9 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     } catch (err) {
       console.error('Checkout failed', err);
       setStatus({ type: 'error', message: t.networkError });
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmittingState(false);
     }
   };
 
@@ -275,17 +297,22 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
         </div>
       )}
 
-      {status.type === 'success' && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '1rem' }}>
-          <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '3rem 2rem', borderRadius: '16px', border: '1px solid #2ecc71', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)', position: 'relative', margin: 'auto' }}>
+      {status.type === 'success' && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', overflow: 'hidden', padding: '1rem' }}>
+          <div className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '3rem 2rem', borderRadius: '16px', border: '1px solid #2ecc71', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.5)', position: 'relative' }}>
             <button
               type="button"
               onClick={() => {
                 document.body.style.overflow = 'unset';
-                if (onClose) onClose();
-                clearCart();
-                if (setStatus) setStatus({ type: '', message: '' });
-                navigate('/menu');
+                if (typeof clearCart === 'function') clearCart();
+                closeSuccessModal();
+                if (typeof closeCart === 'function') closeCart();
+                
+                if (navigate) {
+                  navigate('/menu');
+                } else {
+                  window.location.href = '/menu';
+                }
               }}
               style={{ position: 'absolute', top: '15px', left: language === 'ar' ? '15px' : 'auto', right: language === 'ar' ? 'auto' : '15px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', transition: 'color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.color = '#fff'}
@@ -302,8 +329,14 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
                   type="button"
                   onClick={() => {
                     document.body.style.overflow = 'unset';
-                    if (onClose) onClose();
-                    navigate(`/track?id=${status.orderId}`);
+                    closeSuccessModal();
+                    if (typeof closeCart === 'function') closeCart();
+                    
+                    if (navigate) {
+                      navigate(`/track?id=${status.orderId}`);
+                    } else {
+                      window.location.href = `/track?id=${status.orderId}`;
+                    }
                   }}
                   className="btn-primary"
                   style={{ padding: '1rem 2rem', borderRadius: '50px', fontSize: '1.1rem', width: '100%', backgroundColor: '#2ecc71', border: 'none', cursor: 'pointer' }}
@@ -315,10 +348,15 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
                 type="button"
                 onClick={() => {
                   document.body.style.overflow = 'unset';
-                  if (onClose) onClose();
-                  clearCart();
-                  if (setStatus) setStatus({ type: '', message: '' });
-                  navigate('/menu');
+                  if (typeof clearCart === 'function') clearCart();
+                  closeSuccessModal();
+                  if (typeof closeCart === 'function') closeCart();
+                  
+                  if (navigate) {
+                    navigate('/menu');
+                  } else {
+                    window.location.href = '/menu';
+                  }
                 }}
                 style={{ padding: '1rem 2rem', borderRadius: '50px', fontSize: '1.1rem', width: '100%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.2s' }}
                 onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'var(--text-secondary)' }}
@@ -329,7 +367,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       <ConfirmationModal
         isOpen={showConfirmModal}
@@ -351,13 +389,49 @@ export default function Checkout({ isModal = false, onClose }) {
   const { language } = useLanguage();
 
   const [editingCartItem, setEditingCartItem] = useState(null);
-  const [availableSauces, setAvailableSauces] = useState([]);
   const [maxFreeSauces, setMaxFreeSauces] = useState(2);
+  const [crossSellItems, setCrossSellItems] = useState([]);
+  const [showCrossSell, setShowCrossSell] = useState(true);
+  const [showRecModal, setShowRecModal] = useState(false);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/products`)
+      .then(res => res.json())
+      .then(data => {
+        const cartCategories = cart.map(item => item.category_key);
+        const cartKeys = cart.map(item => item.key);
+        
+        let targetCategories = new Set();
+        
+        if (cartCategories.includes('shawarma')) {
+          targetCategories.add('appetizers'); // Fatteh & sides
+          targetCategories.add('sauces');
+          targetCategories.add('shawarma'); // Boxes
+        }
+        if (cartCategories.includes('appetizers')) {
+          targetCategories.add('appetizers'); // Other fatteh/appetizers
+        }
+        if (cartCategories.includes('meals')) {
+          targetCategories.add('appetizers'); // Sides
+          targetCategories.add('meals'); // Grilled chicken
+        }
+        
+        // Fallback if empty cart or other categories
+        if (targetCategories.size === 0) {
+          targetCategories.add('appetizers');
+          targetCategories.add('drinks');
+          targetCategories.add('sauces');
+        }
+
+        const filtered = data.filter(s => targetCategories.has(s.category_key) && !cartKeys.includes(s.key));
+        const shuffled = filtered.sort(() => 0.5 - Math.random());
+        setCrossSellItems(shuffled.slice(0, 3));
+      })
+      .catch(console.error);
+  }, [cart]);
 
   useEffect(() => {
     try {
-      const savedSauces = localStorage.getItem('availableSauces');
-      if (savedSauces) setAvailableSauces(JSON.parse(savedSauces).filter(s => s.is_available));
       const savedMax = localStorage.getItem('maxFreeSauces');
       if (savedMax) setMaxFreeSauces(parseInt(savedMax, 10));
     } catch {}
@@ -370,7 +444,16 @@ export default function Checkout({ isModal = false, onClose }) {
       }
     };
     window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    
+    const handleForceClose = () => {
+      if (isModal && onClose) onClose();
+    };
+    window.addEventListener('forceCloseCart', handleForceClose);
+    
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('forceCloseCart', handleForceClose);
+    };
   }, [isModal, onClose]);
 
   useEffect(() => {
@@ -539,6 +622,97 @@ export default function Checkout({ isModal = false, onClose }) {
           </div>
         </div>
 
+        {/* Cross-Sell / Suggested Products Section */}
+        {crossSellItems.length > 0 && (
+          <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--gold)' }}>
+                {language === 'ar' ? '💡 قائمة المقترحات' : '💡 Suggested for you'}
+              </h3>
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowCrossSell(!showCrossSell);
+                }}
+                style={{ 
+                  background: showCrossSell ? 'rgba(255,255,255,0.1)' : 'var(--gold)', 
+                  border: 'none', 
+                  color: showCrossSell ? '#fff' : '#000', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '0.5rem', 
+                  fontSize: '0.9rem',
+                  padding: '0.5rem 0.8rem',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  transition: 'all 0.2s ease',
+                  zIndex: 10
+                }}
+              >
+                {showCrossSell 
+                  ? <><X size={20} /> {language === 'ar' ? 'إخفاء' : 'Hide'}</>
+                  : (language === 'ar' ? 'إظهار المقترحات' : 'Show Suggestions')}
+              </button>
+            </div>
+            <div 
+              style={{ 
+                maxHeight: showCrossSell ? '800px' : '0px', 
+                opacity: showCrossSell ? 1 : 0, 
+                overflow: 'hidden', 
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              <div style={{ display: 'flex', overflowX: 'auto', gap: '1rem', paddingBottom: '1rem', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                  {crossSellItems.map(item => (
+                    <div key={item.id} style={{ minWidth: '220px', flexShrink: 0, padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.8rem', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                      {item.img && <img src={item.img} alt={item.name_en} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />}
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{ margin: '0 0 0.4rem', fontSize: '1rem', color: 'var(--text-primary)' }}>
+                          {language === 'ar' ? item.name_ar : item.name_en}
+                        </h4>
+                        <div style={{ color: 'var(--brand-red)', fontWeight: 'bold' }}>
+                          {typeof item.price === 'object' ? Math.min(...Object.values(item.price)) : item.price} {language === 'ar' ? 'ج.م' : 'EGP'}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setEditingCartItem(item)}
+                        style={{ backgroundColor: 'var(--gold)', color: '#000', border: 'none', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d4a331'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--gold)'}
+                      >
+                        {language === 'ar' ? '+ إضافة للسلة' : '+ Add to Cart'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setShowRecModal(true)}
+                    style={{
+                      background: 'none', border: '1px solid var(--gold)', color: 'var(--gold)',
+                      padding: '0.8rem 1.5rem', borderRadius: '25px', fontWeight: 'bold',
+                      cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = 'var(--gold)';
+                      e.currentTarget.style.color = '#000';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--gold)';
+                    }}
+                  >
+                    {language === 'ar' ? 'عرض مقترحات أخرى ➔' : 'Show more recommendations ➔'}
+                  </button>
+                </div>
+            </div>
+          </div>
+        )}
+
         {/* Checkout Form */}
         <div>
           <CheckoutForm
@@ -560,7 +734,7 @@ export default function Checkout({ isModal = false, onClose }) {
         <ProductModal 
           item={editingCartItem}
           categoriesData={[]} 
-          availableSauces={availableSauces}
+          isEditMode={true}
           maxFreeSauces={maxFreeSauces}
           onClose={() => setEditingCartItem(null)}
           onSave={(updatedItem, qty) => {
@@ -657,6 +831,10 @@ export default function Checkout({ isModal = false, onClose }) {
             to   { transform: translateX(0); opacity: 1; }
           }
         `}</style>
+        
+        {showRecModal && (
+          <RecommendationsModal onClose={() => setShowRecModal(false)} />
+        )}
       </div>
     );
   }

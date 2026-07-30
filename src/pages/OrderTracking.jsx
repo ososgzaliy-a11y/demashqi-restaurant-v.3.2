@@ -9,6 +9,7 @@ export default function OrderTracking() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
   const isRTL = language === 'ar';
   const orderIdParam = searchParams.get('id') || '';
 
@@ -24,12 +25,12 @@ export default function OrderTracking() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`http://${window.location.hostname}:3000/api/orders/${idToFetch}`);
+      const response = await fetch(`${API}/api/orders/${idToFetch}`);
       const data = await response.json();
       if (response.ok) {
         setOrder(data);
       } else {
-        setError(isRTL ? "عذراً، رقم الطلب غير موجود أو تم حذفه" : "Sorry, the order number does not exist or has been deleted.");
+        setError(isRTL ? `عذراً، لم نتمكن من العثور على طلب برقم #${idToFetch}، يرجى التأكد من الرقم` : `Sorry, we couldn't find order #${idToFetch}. Please check the number.`);
         setOrder(null);
       }
     } catch (err) {
@@ -58,10 +59,10 @@ export default function OrderTracking() {
   const handleCancelOrder = async () => {
     if (!window.confirm(isRTL ? 'هل أنت متأكد أنك تريد إلغاء الطلب؟' : 'Are you sure you want to cancel the order?')) return;
     try {
-      await fetch(`http://${window.location.hostname}:3000/api/admin/orders/${order.id}`, {
+      await fetch(`${API}/api/admin/orders/${order.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' })
+        body: JSON.stringify({ status: 'cancelled', cancelledBy: 'customer' })
       });
       fetchOrderStatus(order.id);
     } catch (e) {
@@ -78,8 +79,10 @@ export default function OrderTracking() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (orderId) {
-      navigate(`/track?id=${orderId}`);
-      fetchOrderStatus(orderId);
+      const cleanId = orderId.toString().replace('#', '').trim();
+      setOrderId(cleanId);
+      navigate(`/track?id=${cleanId}`);
+      fetchOrderStatus(cleanId);
     }
   };
 

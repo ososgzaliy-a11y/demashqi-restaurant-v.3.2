@@ -20,7 +20,7 @@ export default function AboutUs() {
 
       <section className="section container">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 6vw, 5rem)', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' }}>
-          
+
           <div style={{ textAlign: 'center' }}>
             <h2 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', marginBottom: '2rem', color: 'var(--gold)' }}>
               {language === 'ar' ? 'من نحن' : 'Who We Are'}
@@ -46,23 +46,26 @@ export default function AboutUs() {
             <h2 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', marginBottom: 'clamp(1.5rem, 4vw, 3rem)', color: 'var(--gold)' }}>
               {language === 'ar' ? 'فروعنا' : 'Our Branches'}
             </h2>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
               {[
                 {
                   en: { name: 'Main Branch', address: 'Al-Muhafaza St. - In front of Social Club' },
                   ar: { name: 'الفرع الرئيسي', address: 'شارع المحافظة - امام النادي الاجتماعي' },
-                  phones: '045/3149997 - 01094956760'
+                  phones: '045/3149997 - 01094956760',
+                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
                 },
                 {
                   en: { name: 'Al-Rahibat Branch', address: 'Damanhour - Middle of Al-Rahibat St.' },
                   ar: { name: 'فرع الراهبات', address: 'دمنهور - منتصف شارع الراهبات' },
-                  phones: '045/3220067 - 01060646298'
+                  phones: '045/3220067 - 01060646298',
+                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
                 },
                 {
                   en: { name: 'Damanhour University Branch', address: 'Colleges Complex - University Tower' },
                   ar: { name: 'فرع جامعة دمنهور', address: 'مجمع الكليات - برج الجامعة' },
-                  phones: '045/3149998'
+                  phones: '045/3149998',
+                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
                 }
               ].map((branch, i) => (
                 <div key={i} className={`fade-in stagger-${(i % 4) + 1}`} style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem 2rem', borderRadius: '12px', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, border-color 0.3s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
@@ -77,6 +80,35 @@ export default function AboutUs() {
                     <Phone color="var(--brand-red)" style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{branch.phones}</span>
                   </div>
+
+                  <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                    <a
+                      href={branch.mapLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        width: '100%',
+                        padding: '0.8rem 1rem',
+                        backgroundColor: '#f59e0b', // amber-500
+                        color: '#09090b', // zinc-950
+                        borderRadius: '0.75rem', // xl
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        textDecoration: 'none',
+                        transition: 'background-color 0.2s ease',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d97706'} // amber-600
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f59e0b'}
+                    >
+                      <MapPin size={18} />
+                      {language === 'ar' ? 'اضغط لعرض الموقع' : 'Show on Map'}
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
@@ -90,12 +122,12 @@ export default function AboutUs() {
                 {language === 'ar' ? 'تصفح القائمة الأصلية' : 'View Original Menu'}
               </h2>
               <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
-                {language === 'ar' 
-                  ? 'يمكنك هنا تصفح صفحات المنيو الأصلية الخاصة بنا للتعرف على جميع الأصناف بالتفصيل، من الشاورما السورية الأصيلة والبروستد، إلى البيتزا والمعجنات الطازجة.' 
+                {language === 'ar'
+                  ? 'يمكنك هنا تصفح صفحات المنيو الأصلية الخاصة بنا للتعرف على جميع الأصناف بالتفصيل، من الشاورما السورية الأصيلة والبروستد، إلى البيتزا والمعجنات الطازجة.'
                   : 'Here you can browse our original physical menu pages to see all our items in detail, from authentic Syrian Shawarma and Broasted, to fresh Pizzas and pastries.'}
               </p>
             </div>
-            
+
             <div style={{ flex: '1 1 400px', display: 'flex', gap: '1.5rem' }}>
               <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', border: '2px solid var(--border-color)', transition: 'transform 0.3s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
                 <img src={`${import.meta.env.BASE_URL}Images/44.png`} alt="Menu Page 1" style={{ width: '100%', height: 'auto', display: 'block' }} />

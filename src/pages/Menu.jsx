@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useLocation } from 'react-router-dom';
 import { searchMenuItems } from '../utils/searchUtils';
 import OffersSlider from '../components/OffersSlider';
 import ProductModal from '../components/ProductModal';
@@ -10,22 +11,48 @@ import ProductModal from '../components/ProductModal';
 const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
 
 export default function Menu() {
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
   const { addToCart, openCheckout } = useCart();
   const { t, language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState(null);
-  const [activeCategoryKey, setActiveCategoryKey] = useState("all");
+  const [activeCategoryKey, setActiveCategoryKey] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('category') || "all";
+  });
   const [searchQuery, setSearchQuery] = useState('');
-  const [availableSauces, setAvailableSauces] = useState([]);
   const [maxFreeSauces, setMaxFreeSauces] = useState(2);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('availableSauces');
-      if (saved) setAvailableSauces(JSON.parse(saved).filter(s => s.is_available));
       const savedMax = localStorage.getItem('maxFreeSauces');
       if (savedMax) setMaxFreeSauces(parseInt(savedMax, 10));
     } catch {}
+
+    const handleNavigate = (e) => {
+      if (e.detail) {
+        setActiveCategoryKey(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('navigateToCategory', handleNavigate);
+    return () => window.removeEventListener('navigateToCategory', handleNavigate);
   }, []);
+
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const cat = params.get('category');
+    if (cat) {
+      setActiveCategoryKey(cat);
+    }
+  }, [location]);
+
+  // Auto-scroll to top when a specific category is opened
+  useEffect(() => {
+    if (activeCategoryKey !== "all") {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeCategoryKey]);
 
   const [categoriesData, setCategoriesData] = useState([]);
   const [products, setProducts] = useState([]);
@@ -58,8 +85,8 @@ export default function Menu() {
     const fetchMenu = async () => {
       try {
         const [catRes, prodRes] = await Promise.all([
-          fetch(`http://${window.location.hostname}:3000/api/categories`),
-          fetch(`http://${window.location.hostname}:3000/api/products`)
+          fetch(`${API}/api/categories`),
+          fetch(`${API}/api/products`)
         ]);
         const dbCats = await catRes.json();
         const dbProds = await prodRes.json();
@@ -266,7 +293,7 @@ export default function Menu() {
             ) : (
               /* Items View for Selected Category */
               <div className="fade-in">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '2px solid var(--brand-red)', paddingBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap-reverse', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3rem', borderBottom: '2px solid var(--brand-red)', paddingBottom: '1rem' }}>
                   <button
                     onClick={() => setActiveCategoryKey("all")}
                     className="btn-outline back-to-cat-btn"
@@ -309,7 +336,6 @@ export default function Menu() {
         <ProductModal 
           item={selectedItem}
           categoriesData={categoriesData}
-          availableSauces={availableSauces}
           maxFreeSauces={maxFreeSauces}
           onClose={() => setSelectedItem(null)}
           onSave={handleAddToCart}

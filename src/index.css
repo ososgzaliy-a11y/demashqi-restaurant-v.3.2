@@ -49,6 +49,13 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   overflow-x: hidden;
+  -webkit-user-select: none; /* Safari */
+  user-select: none; /* Non-prefixed version */
+}
+
+input, textarea {
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
 }
 
 h1,
@@ -540,6 +547,50 @@ select {
     grid-template-columns: 1fr !important;
   }
 
+  .responsive-grid-admin {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+  .responsive-table thead {
+    display: none;
+  }
+  .responsive-table tr {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px;
+    padding: 0.5rem;
+    background-color: rgba(255,255,255,0.02) !important;
+  }
+  .responsive-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 0.5rem !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    text-align: right; /* Default RTL support */
+  }
+  .responsive-table td:last-child {
+    border-bottom: none !important;
+  }
+  .responsive-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-inline-end: 1rem;
+    font-size: 0.85rem;
+  }
+
   .responsive-flex {
     flex-direction: column !important;
     gap: 1rem !important;
@@ -644,15 +695,12 @@ select {
 .offer-card {
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, border-color 0.4s ease !important;
   overflow: hidden;
+  -webkit-touch-callout: none; /* Disable iOS context menu on long press */
+  -webkit-user-select: none; /* Disable text selection on iOS */
+  user-select: none; /* Disable text selection */
 }
 
-.offer-card:hover {
-  transform: scale(1.05) translateY(-5px) !important;
-  opacity: 1 !important;
-  box-shadow: 0 20px 40px rgba(229, 185, 66, 0.3), 0 0 20px rgba(229, 185, 66, 0.2) !important;
-  border-color: var(--gold) !important;
-  z-index: 10 !important;
-}
+
 
 /* Shimmer effect */
 .offer-card::before {
@@ -669,4 +717,27 @@ select {
 .offer-card:hover::before {
   left: 200%;
   transition: left 0.8s ease-in-out;
+}
+
+/* ============================================
+   Order Button (Signature Dishes)
+   ============================================ */
+.order-btn {
+    background-color: #ffc107;
+    color: #000000;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.order-btn:hover {
+    background-color: #ffd54f;
+    color: #000000;
+}
+
+.order-btn:active {
+    background-color: #ffb300;
 }

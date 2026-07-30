@@ -3,6 +3,15 @@ import { useLanguage } from '../context/LanguageContext';
 import { AlertTriangle } from 'lucide-react';
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, message, confirmText, cancelText }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
@@ -25,6 +34,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, messa
 
 export default function Reservations() {
   const { language } = useLanguage();
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -36,7 +46,7 @@ export default function Reservations() {
     guests: ''
   });
   const [status, setStatus] = useState({ type: '', message: '' });
-  const [bookedSlots, setBookedSlots] = useState({});
+  const [bookedSlots, setBookedSlots] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmCountdown, setConfirmCountdown] = useState(5);
 
@@ -49,11 +59,19 @@ export default function Reservations() {
   }, [showConfirmModal, confirmCountdown]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('demashqi_booked_slots');
-    if (saved) {
-      setBookedSlots(JSON.parse(saved));
+    if (formData.date) {
+      fetch(`${API}/api/reservations/booked?date=${formData.date}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setBookedSlots(data);
+          }
+        })
+        .catch(err => console.error("Failed to fetch booked slots", err));
+    } else {
+      setBookedSlots([]);
     }
-  }, []);
+  }, [formData.date]);
 
   const generateDates = () => {
     const dates = [];
@@ -170,7 +188,7 @@ export default function Reservations() {
     const payload = { ...formData, tableId: 'TBD' };
 
     try {
-      const response = await fetch(`http://${window.location.hostname}:3000/api/reservations`, {
+      const response = await fetch(`${API}/api/reservations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -182,7 +200,12 @@ export default function Reservations() {
       }
 
       setStatus({ type: 'success', message: language === 'ar' ? 'تم تأكيد الحجز!' : 'Reservation confirmed!' });
-      setFormData(prev => ({ ...prev, name: '', email: '', date: '', time: '', tableId: '', guests: '' }));
+      
+      // Immediately disable the booked slot locally for instant visual feedback
+      setBookedSlots(prev => [...prev, formData.time]);
+      
+      // Clear all fields except the date, so the user sees the available times with their slot now disabled
+      setFormData(prev => ({ ...prev, name: '', email: '', time: '', guests: '', phone: '' }));
     } catch (error) {
       setStatus({ type: 'error', message: language === 'ar' ? 'حدث خطأ أثناء إرسال الحجز.' : 'An error occurred while submitting.' });
     }
@@ -235,10 +258,29 @@ export default function Reservations() {
                   {language === 'ar' ? 'الوقت المتاح' : 'Available Times'}
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '1rem' }}>
-                  {baseTimeSlots.map((slot, i) => {
+                  {baseTimeSlots
+                    .filter(slot => !bookedSlots.includes(slot.time))
+                    .map((slot, i) => {
                     const isSelected = formData.time === slot.time;
                     return (
-                      <button type="button" key={i} onClick={() => selectTime(slot.time)} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', border: `2px solid ${isSelected ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: isSelected ? 'var(--brand-red)' : 'transparent', color: isSelected ? '#fff' : 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.3s ease' }} onMouseEnter={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--brand-red)')} onMouseLeave={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--border-color)')}>
+                      <button 
+                        type="button" 
+                        key={i} 
+                        onClick={() => selectTime(slot.time)} 
+                        style={{ 
+                          padding: '1rem', 
+                          borderRadius: '8px', 
+                          fontSize: '1.1rem', 
+                          fontWeight: 'bold', 
+                          border: `2px solid ${isSelected ? 'var(--brand-red)' : 'var(--border-color)'}`, 
+                          backgroundColor: isSelected ? 'var(--brand-red)' : 'transparent', 
+                          color: isSelected ? '#fff' : 'var(--text-primary)', 
+                          cursor: 'pointer', 
+                          transition: 'all 0.3s ease'
+                        }} 
+                        onMouseEnter={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--brand-red)')} 
+                        onMouseLeave={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--border-color)')}
+                      >
                         {slot.time}
                       </button>
                     );

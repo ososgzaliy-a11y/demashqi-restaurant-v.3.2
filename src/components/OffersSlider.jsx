@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function OffersSlider({ products, items, onItemClick, title }) {
   const { language } = useLanguage();
@@ -7,7 +8,14 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
   const containerRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [isVisible, setIsVisible] = useState(true);
+  const [isPausedForDelay, setIsPausedForDelay] = useState(false);
   const intervalRef = useRef(null);
+  const delayTimeoutRef = useRef(null);
+  const isAutoScrollingRef = useRef(false);
+  const longPressTimeoutRef = useRef(null);
+  const touchStartPosRef = useRef(null);
 
   // Get items (use passed items, or fallback to popular)
   const offerItems = items || (products ? products.filter(p => p.is_popular === 1).slice(0, 8) : []);
@@ -21,23 +29,44 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
   };
 
   const goToNext = useCallback(() => {
+    isAutoScrollingRef.current = true;
     setActiveIndex(prev => (prev + 1) % offerItems.length);
   }, [offerItems.length]);
 
   const goToPrev = useCallback(() => {
+    isAutoScrollingRef.current = true;
     setActiveIndex(prev => (prev - 1 + offerItems.length) % offerItems.length);
   }, [offerItems.length]);
 
-  // Auto-play with 2.5s spotlight per slide
+  // Smart Auto-play with 3.5s spotlight per slide
   useEffect(() => {
-    if (offerItems.length === 0 || isHovered) return;
-    intervalRef.current = setInterval(goToNext, 2500);
+    if (offerItems.length === 0 || isHovered || isPausedForDelay || !isVisible) return;
+    intervalRef.current = setInterval(goToNext, 3500);
     return () => clearInterval(intervalRef.current);
-  }, [isHovered, goToNext, offerItems.length]);
+  }, [isHovered, isPausedForDelay, isVisible, goToNext, offerItems.length]);
+
+  // Intersection Observer to pause when out of view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setIsVisible(entries[0].isIntersecting);
+      },
+      { threshold: 0.1 } // Pauses if less than 10% is visible
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current);
+      }
+    };
+  }, []);
 
   // Sync scroll position when auto-playing without causing vertical page jumps
   useEffect(() => {
-    if (!containerRef.current || isHovered) return;
+    if (!containerRef.current || isHovered || !isAutoScrollingRef.current) return;
     const cards = containerRef.current.querySelectorAll('.offer-card');
     const card = cards[activeIndex];
     if (card) {
@@ -45,10 +74,11 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
       const scrollPos = card.offsetLeft - container.offsetLeft - (container.clientWidth / 2) + (card.clientWidth / 2);
       container.scrollTo({ left: scrollPos, behavior: 'smooth' });
     }
+    isAutoScrollingRef.current = false; // Reset after auto-scroll
   }, [activeIndex, isHovered]);
 
   const handleScroll = (e) => {
-    if (!isHovered) return; // Only update activeIndex manually if user is interacting
+    // We update activeIndex natively without fighting the scroll, to let momentum work
     const container = e.target;
     const scrollLeft = container.scrollLeft;
     const cardWidth = 260 + 24; // width + gap approx
@@ -56,6 +86,50 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
     if (newIndex < 0) newIndex = 0;
     if (newIndex >= offerItems.length) newIndex = offerItems.length - 1;
     setActiveIndex(newIndex);
+  };
+
+  const handleInteractionStart = () => {
+    setIsHovered(true);
+    if (delayTimeoutRef.current) clearTimeout(delayTimeoutRef.current);
+    setIsPausedForDelay(true);
+  };
+
+  const handleInteractionEnd = () => {
+    setIsHovered(false);
+    if (delayTimeoutRef.current) clearTimeout(delayTimeoutRef.current);
+    delayTimeoutRef.current = setTimeout(() => {
+      setIsPausedForDelay(false);
+    }, 10000); // Wait 10 seconds before resuming autoplay
+  };
+
+  const handleCardTouchStart = (e, index) => {
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    longPressTimeoutRef.current = setTimeout(() => {
+      setActiveIndex(index);
+      setHoveredIndex(null); // Clear any hover effect just in case
+    }, 200);
+  };
+
+  const handleCardTouchMove = (e) => {
+    if (!touchStartPosRef.current || !longPressTimeoutRef.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    
+    // If user moved their finger more than 10px, it's a swipe, not a hold
+    if (dx > 10 || dy > 10) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+  };
+
+  const handleCardTouchEnd = () => {
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
   };
 
   if (offerItems.length === 0) return null;
@@ -80,10 +154,10 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
       {/* Slider Track */}
       <div
         style={{ position: 'relative', overflow: 'hidden' }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onTouchStart={() => setIsHovered(true)}
-        onTouchEnd={() => { setIsHovered(false); }}
+        onMouseEnter={handleInteractionStart}
+        onMouseLeave={handleInteractionEnd}
+        onTouchStart={handleInteractionStart}
+        onTouchEnd={handleInteractionEnd}
       >
           <div
             ref={containerRef}
@@ -95,21 +169,25 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
               padding: '1.5rem 1rem 2rem 1rem', // Add padding for shadow and scaling
               msOverflowStyle: 'none',
               scrollbarWidth: 'none',
-              scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y', // ensure vertical scroll is not blocked
               height: '420px', // Fixed height to prevent shifting
               alignItems: 'center',
             }}
             className="hide-scrollbar"
           >
             {offerItems.map((item, index) => {
-            const isActive = index === activeIndex;
+            const isActive = hoveredIndex !== null ? index === hoveredIndex : index === activeIndex;
             return (
               <div
                 key={item.id}
                 className="offer-card"
                 onClick={() => onItemClick && onItemClick(item)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onTouchStart={(e) => handleCardTouchStart(e, index)}
+                onTouchMove={handleCardTouchMove}
+                onTouchEnd={handleCardTouchEnd}
+                onContextMenu={(e) => e.preventDefault()}
                 style={{
                   flex: '0 0 auto',
                   width: '260px',
@@ -131,7 +209,6 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
                   cursor: 'pointer',
                   zIndex: isActive ? 2 : 1,
                   position: 'relative',
-                  scrollSnapAlign: 'center',
                 }}
               >
                 {/* Active spotlight glow overlay */}
@@ -197,24 +274,54 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
           })}
         </div>
 
-        {/* Navigation Dots */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-          {offerItems.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIndex(i)}
-              style={{
-                width: i === activeIndex ? '24px' : '8px',
-                height: '8px',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: i === activeIndex ? 'var(--gold)' : 'var(--border-color)',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                padding: 0,
-              }}
-            />
-          ))}
+        {/* Navigation Dots and Arrows */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '0.5rem' }}>
+          <button 
+            onClick={() => setActiveIndex(prev => Math.max(0, prev - 1))}
+            style={{ 
+              background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', 
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: 'var(--text-secondary)', cursor: activeIndex === 0 ? 'not-allowed' : 'pointer',
+              opacity: activeIndex === 0 ? 0.3 : 1
+            }}
+            disabled={activeIndex === 0}
+          >
+            {isRTL ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+          
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {offerItems.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveIndex(i)}
+                style={{
+                  width: i === activeIndex ? '24px' : '8px',
+                  height: '8px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: i === activeIndex ? 'var(--gold)' : 'var(--border-color)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  padding: 0,
+                  outline: 'none',
+                }}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+          
+          <button 
+            onClick={() => setActiveIndex(prev => Math.min(offerItems.length - 1, prev + 1))}
+            style={{ 
+              background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', 
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: 'var(--text-secondary)', cursor: activeIndex === offerItems.length - 1 ? 'not-allowed' : 'pointer',
+              opacity: activeIndex === offerItems.length - 1 ? 0.3 : 1
+            }}
+            disabled={activeIndex === offerItems.length - 1}
+          >
+            {isRTL ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
         </div>
       </div>
 

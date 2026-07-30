@@ -64,26 +64,30 @@ const Navbar = () => {
             <span style={{ fontWeight: 'bold' }}>{language === 'en' ? 'عربي' : 'EN'}</span>
           </button>
 
-          <button onClick={openCheckout} className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <ShoppingCart size={20} />
-            {cartItemCount > 0 && (
-              <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px' }}>
-                {cartItemCount}
-              </span>
-            )}
-          </button>
+          {path !== '/admin' && path !== '/management' && (
+            <button onClick={openCheckout} className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <ShoppingCart size={20} />
+              {cartItemCount > 0 && (
+                <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px' }}>
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Mobile: cart + hamburger */}
         <div className="nav-mobile-controls" style={{ display: 'none', alignItems: 'center', gap: '1rem', zIndex: 1100 }}>
-          <button onClick={openCheckout} style={{ display: 'flex', alignItems: 'center', position: 'relative', color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <ShoppingCart size={22} />
-            {cartItemCount > 0 && (
-              <span style={{ position: 'absolute', top: '-8px', right: '-10px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
-                {cartItemCount}
-              </span>
-            )}
-          </button>
+          {path !== '/admin' && path !== '/management' && (
+            <button onClick={openCheckout} style={{ display: 'flex', alignItems: 'center', position: 'relative', color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <ShoppingCart size={22} />
+              {cartItemCount > 0 && (
+                <span style={{ position: 'absolute', top: '-8px', right: '-10px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => setMenuOpen(prev => !prev)}
             aria-label="Toggle menu"
@@ -188,8 +192,8 @@ const FloatingCart = () => {
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const location = useLocation();
 
-  // Show only on menu page when cart is not empty
-  if (cartItemCount === 0 || location.pathname !== '/menu') return null;
+  const isDashboard = location.pathname === '/admin' || location.pathname === '/management';
+  if (cartItemCount === 0 || isDashboard) return null;
 
   return (
     <div className="flex flex-col items-end gap-2" style={{ position: 'fixed', right: '1.5rem', bottom: '12vh', zIndex: 50, pointerEvents: 'auto' }}>

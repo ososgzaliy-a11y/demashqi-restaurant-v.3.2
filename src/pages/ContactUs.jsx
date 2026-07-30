@@ -3,6 +3,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export default function ContactUs() {
   const { t, language } = useLanguage();
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,7 +22,7 @@ export default function ContactUs() {
     setStatus({ type: 'loading', message: t('contact.form.sending') });
     
     try {
-      const response = await fetch(`http://${window.location.hostname}:3000/api/contact`, {
+      const response = await fetch(`${API}/api/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

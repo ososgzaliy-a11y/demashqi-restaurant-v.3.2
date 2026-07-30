@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle, Trash2, Archive, Clock, DollarSign, TrendingUp, XCircle, Activity } from 'lucide-react';
+import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle, Trash2, Archive, Clock, DollarSign, TrendingUp, XCircle, Activity, Edit2, Plus, Eye, X } from 'lucide-react';
 
 // ── Status Configuration ──────────────────────────────────────
 const ORDER_STATUSES = {
@@ -11,15 +11,13 @@ const ORDER_STATUSES = {
 };
 
 const RESERVATION_STATUSES = {
-  pending:   { label: 'قيد التأكيد', labelEn: 'Pending',    emoji: '🟡', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
   confirmed: { label: 'مؤكد',       labelEn: 'Confirmed',  emoji: '🟢', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  cancelled: { label: 'ملغي',       labelEn: 'Cancelled',  emoji: '🔴', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
   completed: { label: 'مكتمل',      labelEn: 'Completed',  emoji: '⚪', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' },
 };
 
 // ── Status Badge Component ────────────────────────────────────
 const StatusBadge = ({ status, config }) => {
-  const s = config[status] || config.pending;
+  const s = config[status] || config.pending || config.confirmed || { emoji: '❓', labelEn: status || 'Unknown', color: '#999', bg: '#333' };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -67,9 +65,38 @@ const filterBtnStyle = (active) => ({
 import { useLanguage } from '../context/LanguageContext';
 import AdminCategories from '../components/AdminCategories';
 import AdminProducts from '../components/AdminProducts';
-import AdminSauces from '../components/AdminSauces';
 
-export default function Admin() {
+class AdminErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Admin Panel Error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '5rem', textAlign: 'center', color: '#fff', minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <AlertCircle size={64} color="var(--brand-red)" style={{ marginBottom: '1.5rem' }} />
+          <h2 style={{ marginBottom: '1rem' }}>حدث خطأ أثناء تحميل لوحة التحكم، يرجى إعادة التحميل</h2>
+          <button onClick={() => {
+            localStorage.clear();
+            window.location.reload();
+          }} style={{ padding: '1rem 2rem', backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', marginTop: '1rem' }}>
+            تفريغ الذاكرة المؤقتة وإعادة المحاولة
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AdminContent() {
   const { language, t } = useLanguage();
   const isRTL = language === 'ar';
   
@@ -83,6 +110,7 @@ export default function Admin() {
   const [archiveFilter, setArchiveFilter] = useState('all');
   const [resvFilter, setResvFilter] = useState('all');
   const [toast, setToast] = useState({ visible: false, message: '' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [salesAnalytics, setSalesAnalytics] = useState(() => {
     try {
@@ -105,12 +133,19 @@ export default function Admin() {
     localStorage.setItem('salesAnalytics', JSON.stringify(salesAnalytics));
   }, [salesAnalytics]);
 
+  useEffect(() => {
+    if (sessionStorage.getItem('admin_session') === 'true') {
+      setIsAuthenticated(true);
+      fetchData();
+    }
+  }, []);
+
   const showToast = (message) => {
     setToast({ visible: true, message });
     setTimeout(() => setToast({ visible: false, message: '' }), 2500);
   };
 
-  const API = `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -123,6 +158,7 @@ export default function Admin() {
       });
       const resData = await response.json();
       if (response.ok && resData.success) {
+        sessionStorage.setItem('admin_session', 'true');
         setIsAuthenticated(true);
         fetchData();
       } else {
@@ -136,7 +172,6 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      await fetch(`${API}/api/admin/orders/cleanup`, { method: 'DELETE' }).catch(() => {});
       const [ordersRes, resvRes, contactsRes, categoriesRes, productsRes] = await Promise.all([
         fetch(`${API}/api/admin/orders`),
         fetch(`${API}/api/admin/reservations`),
@@ -149,6 +184,55 @@ export default function Admin() {
       const contacts = contactsRes.ok ? await contactsRes.json() : [];
       const categories = categoriesRes.ok ? await categoriesRes.json() : [];
       const products = productsRes.ok ? await productsRes.json() : [];
+      
+      setSalesAnalytics(s => {
+        let newTotalRev = s.totalRevenue;
+        let newCompletedCount = s.completedOrdersCount;
+        let newCancelledRev = s.cancelledRevenue;
+        let newCancelledCount = s.cancelledOrdersCount;
+        let changed = false;
+        const newProcessed = { ...s.processedOrders };
+
+        if (Array.isArray(orders)) {
+          orders.forEach(order => {
+            const currentStatus = newProcessed[order.id];
+            const newStatus = order.status;
+            
+            if (currentStatus !== newStatus && (newStatus === 'completed' || newStatus === 'cancelled')) {
+               changed = true;
+               if (currentStatus === 'completed') {
+                  newTotalRev -= (order.total || 0);
+                  newCompletedCount -= 1;
+               } else if (currentStatus === 'cancelled') {
+                  newCancelledRev -= (order.total || 0);
+                  newCancelledCount -= 1;
+               }
+               
+               if (newStatus === 'completed') {
+                  newTotalRev += (order.total || 0);
+                  newCompletedCount += 1;
+                  newProcessed[order.id] = 'completed';
+               } else if (newStatus === 'cancelled') {
+                  newCancelledRev += (order.total || 0);
+                  newCancelledCount += 1;
+                  newProcessed[order.id] = 'cancelled';
+               }
+            }
+          });
+        }
+
+        if (changed) {
+          return {
+            totalRevenue: Math.max(0, newTotalRev),
+            completedOrdersCount: Math.max(0, newCompletedCount),
+            cancelledRevenue: Math.max(0, newCancelledRev),
+            cancelledOrdersCount: Math.max(0, newCancelledCount),
+            processedOrders: newProcessed
+          };
+        }
+        return s;
+      });
+
       setData({ orders, reservations, contacts, categories, products });
     } catch (err) {
       console.error('Error fetching admin data', err);
@@ -194,6 +278,32 @@ export default function Admin() {
                 newTotalRev += orderTotal;
                 newCompletedCount += 1;
                 newProcessed[orderId] = 'completed';
+
+                // Sync to Management Dashboard (mock data v3)
+                try {
+                  const mgmtDataRaw = localStorage.getItem('management_mock_data_v3');
+                  if (mgmtDataRaw) {
+                    const mgmtData = JSON.parse(mgmtDataRaw);
+                    mgmtData.kpis.totalSales += orderTotal;
+                    mgmtData.kpis.netSales += orderTotal;
+                    mgmtData.kpis.totalOrders += 1;
+                    mgmtData.recentOrders.unshift({
+                      id: orderToUpdate.daily_id ? `#ORD-${orderToUpdate.daily_id}` : `#ORD-${orderId}`,
+                      ref: `REF-${orderId}`,
+                      customer: orderToUpdate.name || orderToUpdate.customer || 'Customer',
+                      phone: orderToUpdate.phone || '01000000000',
+                      address: orderToUpdate.address || 'N/A',
+                      total: `EGP ${orderTotal}`,
+                      status: 'Completed',
+                      time: 'Just now',
+                      duration: '30 mins',
+                      items: orderToUpdate.items || []
+                    });
+                    if (mgmtData.recentOrders.length > 50) mgmtData.recentOrders.pop();
+                    localStorage.setItem('management_mock_data_v3', JSON.stringify(mgmtData));
+                  }
+                } catch (e) { console.error('Sync to management failed', e); }
+
               } else if (newStatus === 'cancelled') {
                 newCancelledRev += orderTotal;
                 newCancelledCount += 1;
@@ -211,7 +321,7 @@ export default function Admin() {
           }
           return {
             ...prev,
-            orders: prev.orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o)
+            orders: prev.orders.map(o => o.id === orderId ? { ...o, status: newStatus, archived_at: newStatus === 'completed' ? Date.now() : o.archived_at } : o)
           };
         });
         showToast(`Order #${orderId} → ${ORDER_STATUSES[newStatus]?.labelEn || newStatus}`);
@@ -275,22 +385,44 @@ export default function Admin() {
   };
 
   // ── Filtered Data ─────────────────────────────────────────
-  const activeOrdersList = data.orders.filter(o => !['completed', 'cancelled'].includes(o.status));
-  const archivedOrdersList = data.orders.filter(o => ['completed', 'cancelled'].includes(o.status));
+  // ── Filtered Data (Defensive) ───────────────────────────
+  const safeOrders = Array.isArray(data.orders) ? data.orders : [];
+  const safeReservations = Array.isArray(data.reservations) ? data.reservations : [];
+  const safeContacts = Array.isArray(data.contacts) ? data.contacts : [];
+  const safeCategories = Array.isArray(data.categories) ? data.categories : [];
+  const safeProducts = Array.isArray(data.products) ? data.products : [];
 
-  const filteredOrders = orderFilter === 'all'
-    ? activeOrdersList
-    : activeOrdersList.filter(o => o.status === orderFilter);
+  const activeOrdersList = safeOrders.filter(o => !['completed', 'cancelled'].includes(o?.status));
+  const archivedOrdersList = safeOrders.filter(o => {
+    if (!['completed', 'cancelled'].includes(o?.status)) return false;
+    if (o.archived_at) {
+      const hoursArchived = (Date.now() - o.archived_at) / (1000 * 60 * 60);
+      return hoursArchived < 24;
+    }
+    return true;
+  });
 
-  const filteredArchivedOrders = archiveFilter === 'all'
-    ? archivedOrdersList
-    : archivedOrdersList.filter(o => o.status === archiveFilter);
+  const filteredOrders = activeOrdersList.filter(o => {
+    const matchesFilter = orderFilter === 'all' || o?.status === orderFilter;
+    const matchesSearch = searchQuery === '' || 
+      String(o.id).includes(searchQuery) || 
+      String(o.daily_id || '').includes(searchQuery) || 
+      (o.name || o.customer || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const filteredArchivedOrders = archivedOrdersList.filter(o => {
+    const matchesFilter = archiveFilter === 'all' || o?.status === archiveFilter;
+    const matchesSearch = searchQuery === '' || 
+      String(o.id).includes(searchQuery) || 
+      String(o.daily_id || '').includes(searchQuery) || 
+      (o.name || o.customer || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   const filteredReservations = resvFilter === 'all'
-    ? data.reservations
-    : resvFilter === 'active'
-      ? data.reservations.filter(r => !['completed', 'cancelled'].includes(r.status))
-      : data.reservations.filter(r => r.status === resvFilter);
+    ? safeReservations
+    : safeReservations.filter(r => r?.status === resvFilter);
 
   // ── Login Screen ──────────────────────────────────────────
   if (!isAuthenticated) {
@@ -340,68 +472,29 @@ export default function Admin() {
             <h1 style={{ fontSize: '2.5rem' }}>Admin Dashboard</h1>
             <p style={{ color: 'var(--text-secondary)' }}>Manage live orders, table reservations, and customer feedback</p>
           </div>
-          <button onClick={fetchData} disabled={loading} className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 1.5rem', fontSize: '0.95rem', opacity: loading ? 0.6 : 1 }}>
-            <RefreshCw size={18} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh Data
-          </button>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button onClick={fetchData} disabled={loading} className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 1.5rem', fontSize: '0.95rem', opacity: loading ? 0.6 : 1 }}>
+              <RefreshCw size={18} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh Data
+            </button>
+            <button onClick={() => { sessionStorage.removeItem('admin_session'); setIsAuthenticated(false); }} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 1.5rem', fontSize: '0.95rem', backgroundColor: 'var(--brand-red)' }}>
+              <Lock size={18} /> {isRTL ? 'تسجيل الخروج' : 'Logout'}
+            </button>
+          </div>
         </div>
       </header>
 
       <section className="section container">
-        {/* ── Financial Analytics Dashboard ────────────────────── */}
-        <div style={{ marginBottom: '2.5rem', backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--text-primary)' }}>
-              <TrendingUp size={24} color="var(--gold)" />
-              {isRTL ? 'التقارير المالية والمبيعات' : 'Financial Analytics Dashboard'}
-            </h2>
-            <button
-              onClick={() => {
-                if (window.confirm(isRTL ? 'هل أنت متأكد من تصفير الحسابات؟' : 'Are you sure you want to reset sales data?')) {
-                  setSalesAnalytics({ totalRevenue: 0, completedOrdersCount: 0, cancelledOrdersCount: 0, cancelledRevenue: 0, processedOrders: {} });
-                }
-              }}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-            >
-              <RefreshCw size={16} /> {isRTL ? 'إعادة ضبط الحسابات' : 'Reset Sales Data'}
-            </button>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-            {/* Total Revenue */}
-            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(229,185,66,0.1)', border: '1px solid rgba(229,185,66,0.2)' }}>
-              <div style={{ color: 'var(--gold)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><DollarSign size={18} /> {isRTL ? 'إجمالي المبيعات' : 'Total Revenue'}</div>
-              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.totalRevenue} EGP</div>
-            </div>
-            {/* Completed Orders */}
-            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <div style={{ color: '#22C55E', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={18} /> {isRTL ? 'الطلبات الناجحة' : 'Successful Orders'}</div>
-              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.completedOrdersCount}</div>
-            </div>
-            {/* Cancelled Orders */}
-            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <div style={{ color: '#EF4444', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><XCircle size={18} /> {isRTL ? 'الطلبات الملغاة' : 'Cancelled Orders'}</div>
-              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.cancelledOrdersCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>({salesAnalytics.cancelledRevenue} EGP)</span></div>
-            </div>
-            {/* Net Total Orders */}
-            <div style={{ padding: '1.5rem', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={18} /> {isRTL ? 'صافي الطلبات الإجمالي' : 'Net Total Orders'}</div>
-              <div style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--text-primary)' }}>{salesAnalytics.completedOrdersCount + salesAnalytics.cancelledOrdersCount}</div>
-            </div>
-          </div>
-        </div>
+        {/* Financial Analytics section removed for Staff/Admin - Restricted to Manager panel only */}
 
         {/* ── Navigation Tabs ────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', overflowX: 'auto' }}>
+        <div className="hide-scrollbar" style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {[
             { key: 'orders', icon: <ShoppingBag size={20} />, label: isRTL ? 'الطلبات النشطة' : 'Active Orders', count: activeOrdersList.length },
             { key: 'archive', icon: <Archive size={20} />, label: isRTL ? 'أرشيف الطلبات' : 'Archive', count: archivedOrdersList.length },
-            { key: 'reservations', icon: <Calendar size={20} />, label: isRTL ? 'الحجوزات' : 'Reservations', count: data.reservations.length },
-            { key: 'contacts', icon: <MessageSquare size={20} />, label: isRTL ? 'الرسائل' : 'Messages', count: data.contacts.length },
-            { key: 'categories', icon: <Filter size={20} />, label: isRTL ? 'الأقسام' : 'Categories', count: data.categories.length },
-            { key: 'products', icon: <ShoppingBag size={20} />, label: isRTL ? 'المنتجات' : 'Products', count: data.products.length },
-            { key: 'sauces', icon: <Edit2 size={20} />, label: isRTL ? 'الصوصات' : 'Sauces', count: '' },
+            { key: 'reservations', icon: <Calendar size={20} />, label: isRTL ? 'الحجوزات' : 'Reservations', count: safeReservations.length },
+            { key: 'contacts', icon: <MessageSquare size={20} />, label: isRTL ? 'الرسائل' : 'Messages', count: safeContacts.length },
+            { key: 'categories', icon: <Filter size={20} />, label: isRTL ? 'الأقسام' : 'Categories', count: safeCategories.length },
+            { key: 'products', icon: <ShoppingBag size={20} />, label: isRTL ? 'المنتجات' : 'Products', count: safeProducts.length },
           ].map(tab => (
             <button
               key={tab.key}
@@ -425,13 +518,22 @@ export default function Admin() {
         {activeTab === 'orders' && (
           <div>
             {/* Filter Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <Filter size={16} color="var(--text-secondary)" />
-              {['all', 'pending', 'preparing', 'on_the_way'].map(f => (
-                <button key={f} onClick={() => setOrderFilter(f)} style={filterBtnStyle(orderFilter === f)}>
-                  {f === 'all' ? 'All Active' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
-                </button>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <Filter size={16} color="var(--text-secondary)" />
+                {['all', 'pending', 'preparing', 'on_the_way'].map(f => (
+                  <button key={f} onClick={() => setOrderFilter(f)} style={filterBtnStyle(orderFilter === f)}>
+                    {f === 'all' ? 'All Active' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
+                  </button>
+                ))}
+              </div>
+              <input 
+                type="text" 
+                placeholder={isRTL ? "بحث برقم الأوردر أو العميل..." : "Search Order ID or Customer..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', minWidth: '250px' }}
+              />
             </div>
 
             {filteredOrders.length === 0 ? (
@@ -446,20 +548,28 @@ export default function Admin() {
                     {/* Header Row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--gold)' }}>Order #{order.daily_id || order.id}</span>
-                        <StatusBadge status={order.status || 'pending'} config={ORDER_STATUSES} />
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                          {order.created_at ? new Date(order.created_at).toLocaleString() : '—'}
+                          <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Order {order.daily_id ? `#ORD-${order.daily_id}` : `#ORD-${order.id}`}</span>
+                          <StatusBadge status={order.status} config={ORDER_STATUSES} />
+                        {order?.status === 'cancelled' && order?.cancelled_by === 'customer' && (
+                          <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: 'var(--brand-red)', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                            {isRTL ? 'ملغي من قبل العميل' : 'Cancelled by customer'}
+                          </span>
+                        )}
+                        <span 
+                          title={order?.created_at ? new Date(order.created_at).toLocaleString(isRTL ? 'ar-EG' : 'en-US') : ''}
+                          style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'help' }}
+                        >
+                          {order?.created_at ? new Date(order.created_at).toLocaleTimeString(isRTL ? 'ar-EG' : 'en-US', {hour: '2-digit', minute:'2-digit'}) : '—'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Change:</span>
                         <select
-                          value={order.status || 'pending'}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          value={order?.status || 'pending'}
+                          onChange={(e) => updateOrderStatus(order?.id, e.target.value)}
                           style={selectStyle}
                         >
-                          {Object.entries(ORDER_STATUSES).map(([val, cfg]) => (
+                          {Object.entries(ORDER_STATUSES).filter(([val]) => val !== 'cancelled').map(([val, cfg]) => (
                             <option key={val} value={val}>{cfg.emoji} {cfg.labelEn}</option>
                           ))}
                         </select>
@@ -491,8 +601,9 @@ export default function Admin() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
                       {/* Customer & Address */}
                       <div>
-                        <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer & Address</h4>
-                        <p style={{ margin: 0, fontWeight: '600', lineHeight: '1.6' }}>{order.address}</p>
+                        <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.8rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer & Address</h4>
+                        <p style={{ margin: '0 0 0.5rem 0', fontWeight: '800', fontSize: '1.2rem', color: 'var(--gold)' }}>👤 {order.name || order.customer || 'Unknown Customer'}</p>
+                        <p style={{ margin: 0, fontWeight: '500', lineHeight: '1.6' }}>{order.address}</p>
                         <p style={{ margin: '0.3rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>📞 {order.phone || '—'}</p>
                         {order.notes && (
                           <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.85rem' }}>
@@ -550,13 +661,20 @@ export default function Admin() {
         {activeTab === 'archive' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', flex: 1 }}>
                 <Filter size={16} color="var(--text-secondary)" />
                 {['all', 'completed', 'cancelled'].map(f => (
                   <button key={f} onClick={() => setArchiveFilter(f)} style={filterBtnStyle(archiveFilter === f)}>
                     {f === 'all' ? 'All Archived' : ORDER_STATUSES[f] ? `${ORDER_STATUSES[f].emoji} ${ORDER_STATUSES[f].labelEn}` : f}
                   </button>
                 ))}
+                <input 
+                  type="text" 
+                  placeholder={isRTL ? "بحث في الأرشيف..." : "Search Archive..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-primary)', flex: '1', minWidth: '200px' }}
+                />
               </div>
               <button 
                 onClick={clearArchive}
@@ -588,24 +706,20 @@ export default function Admin() {
                     <div key={order.id} style={{ ...cardStyle, borderLeft: `4px solid ${accentColor}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Order #{order.daily_id || order.id}</span>
+                          <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Order {order.daily_id ? `#ORD-${order.daily_id}` : `#ORD-${order.id}`}</span>
                           <StatusBadge status={order.status} config={ORDER_STATUSES} />
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span 
+                            title={order?.created_at ? new Date(order.created_at).toLocaleString(isRTL ? 'ar-EG' : 'en-US') : ''}
+                            style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'help' }}
+                          >
                             <Clock size={14} /> 
-                            {isRTL ? `سيتم المسح التلقائي بعد ${minutesRemaining > 0 ? minutesRemaining : 0} دقيقة (وضع الاختبار)` : `Auto-delete in ${minutesRemaining > 0 ? minutesRemaining : 0}m (Test Mode)`}
+                            {order?.created_at ? new Date(order.created_at).toLocaleTimeString(isRTL ? 'ar-EG' : 'en-US', {hour: '2-digit', minute:'2-digit'}) : '—'}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', opacity: 0.7, marginLeft: '0.5rem' }}>
+                            ({isRTL ? 'مسح تلقائي بعد 24س' : 'Auto-clear 24h'})
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Restore/Change:</span>
-                          <select
-                            value={order.status}
-                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                            style={selectStyle}
-                          >
-                            {Object.entries(ORDER_STATUSES).map(([val, cfg]) => (
-                              <option key={val} value={val}>{cfg.emoji} {cfg.labelEn}</option>
-                            ))}
-                          </select>
                           <button 
                             onClick={() => deleteOrder(order.id)}
                             style={{
@@ -621,7 +735,8 @@ export default function Admin() {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', opacity: 0.8 }}>
                         <div>
-                          <p style={{ margin: 0, fontWeight: '600' }}>{order.address}</p>
+                          <p style={{ margin: '0 0 0.5rem 0', fontWeight: '800', fontSize: '1.1rem', color: 'var(--gold)' }}>👤 {order.name || order.customer || 'Unknown Customer'}</p>
+                          <p style={{ margin: 0, fontWeight: '500' }}>{order.address}</p>
                           <p style={{ margin: '0.3rem 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>📞 {order.phone || '—'}</p>
                         </div>
                         <div>
@@ -667,9 +782,9 @@ export default function Admin() {
             {/* Filter Bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
               <Filter size={16} color="var(--text-secondary)" />
-              {['all', 'active', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
+              {['all', 'confirmed', 'completed'].map(f => (
                 <button key={f} onClick={() => setResvFilter(f)} style={filterBtnStyle(resvFilter === f)}>
-                  {f === 'all' ? 'All' : f === 'active' ? '🔥 Active' : RESERVATION_STATUSES[f] ? `${RESERVATION_STATUSES[f].emoji} ${RESERVATION_STATUSES[f].labelEn}` : f}
+                  {f === 'all' ? 'All' : RESERVATION_STATUSES[f] ? `${RESERVATION_STATUSES[f].emoji} ${RESERVATION_STATUSES[f].labelEn}` : f}
                 </button>
               ))}
             </div>
@@ -680,7 +795,7 @@ export default function Admin() {
                 <p style={{ fontSize: '1.1rem' }}>No reservations match this filter.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                 {filteredReservations.map(res => (
                   <div key={res.id} style={cardStyle} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand-red)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}>
                     {/* Reservation Header */}
@@ -708,19 +823,6 @@ export default function Admin() {
                       <p style={{ margin: '0 0 1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>🪑 Table: <strong style={{ color: '#fff' }}>{res.tableId}</strong></p>
                     )}
 
-                    {/* Status Dropdown */}
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status:</span>
-                      <select
-                        value={res.status || 'pending'}
-                        onChange={(e) => updateReservationStatus(res.id, e.target.value)}
-                        style={selectStyle}
-                      >
-                        {Object.entries(RESERVATION_STATUSES).map(([val, cfg]) => (
-                          <option key={val} value={val}>{cfg.emoji} {cfg.labelEn}</option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -733,7 +835,7 @@ export default function Admin() {
             ═══════════════════════════════════════════════════════ */}
         {activeTab === 'contacts' && (
           <div>
-            {data.contacts.length === 0 ? (
+            {safeContacts.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
                 <AlertCircle size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
                 <p style={{ fontSize: '1.1rem' }}>No messages found.</p>
@@ -760,23 +862,24 @@ export default function Admin() {
             TAB 4: CATEGORIES MANAGEMENT
             ═══════════════════════════════════════════════════════ */}
         {activeTab === 'categories' && (
-          <AdminCategories categories={data.categories} fetchData={fetchData} API={API} />
+          <AdminCategories categories={data.categories} fetchData={fetchData} API={API} showToast={showToast} />
         )}
 
         {/* ═══════════════════════════════════════════════════════
             TAB 5: PRODUCTS MANAGEMENT
             ═══════════════════════════════════════════════════════ */}
         {activeTab === 'products' && (
-          <AdminProducts products={data.products} categories={data.categories} fetchData={fetchData} API={API} />
-        )}
-
-        {/* ═══════════════════════════════════════════════════════
-            TAB 6: SAUCES MANAGEMENT
-            ═══════════════════════════════════════════════════════ */}
-        {activeTab === 'sauces' && (
-          <AdminSauces categories={data.categories} />
+          <AdminProducts products={data.products} categories={data.categories} fetchData={fetchData} API={API} showToast={showToast} />
         )}
       </section>
     </div>
+  );
+}
+
+export default function Admin(props) {
+  return (
+    <AdminErrorBoundary>
+      <AdminContent {...props} />
+    </AdminErrorBoundary>
   );
 }

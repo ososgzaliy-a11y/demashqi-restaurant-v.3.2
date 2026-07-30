@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check } from 'lucide-react';
+import { X, Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function ProductModal({
   item,
@@ -13,6 +14,7 @@ export default function ProductModal({
   isEditMode = false
 }) {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   
   const [selectedSize, setSelectedSize] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -55,31 +57,32 @@ export default function ProductModal({
 
   if (!item || typeof document === 'undefined') return null;
 
-  // Combine item.sauces and availableSauces before using them for price calculation
+  // Combine item.sauces
   const combinedSauces = [];
   if (item.sauces && item.sauces.length > 0) {
-    item.sauces.forEach(sauceName => {
-      combinedSauces.push({
-        id: `item-sauce-${sauceName}`,
-        name_ar: sauceName,
-        name_en: sauceName,
-        price: 0
-      });
+    item.sauces.forEach((sauce, idx) => {
+      if (typeof sauce === 'string') {
+        combinedSauces.push({
+          id: `item-sauce-${sauce}-${idx}`,
+          name_ar: sauce,
+          name_en: sauce,
+          price: 0
+        });
+      } else if (sauce && sauce.name) {
+        combinedSauces.push({
+          id: `item-sauce-${sauce.name}-${idx}`,
+          name_ar: sauce.name,
+          name_en: sauce.name,
+          price: Number(sauce.price) || 0
+        });
+      }
     });
   }
-  availableSauces.filter(sauce => {
-    const cats = sauce.assignedCategories || ['all'];
-    return cats.includes('all') || (item.category_key && cats.includes(item.category_key));
-  }).forEach(sauce => {
-    if (!combinedSauces.find(s => s.name_ar === sauce.name_ar || s.name_en === sauce.name_en)) {
-      combinedSauces.push(sauce);
-    }
-  });
 
   const extraSaucePrice = selectedSauces
     .map(name => {
       const sauceObj = combinedSauces.find(s => s.name_ar === name || s.name_en === name);
-      return sauceObj?.price > 0 ? sauceObj.price : 5; // Fallback to 5 EGP if no price specified
+      return sauceObj?.price > 0 ? sauceObj.price : 0;
     })
     .sort((a, b) => a - b)
     .slice(maxFreeSauces)
@@ -97,7 +100,8 @@ export default function ProductModal({
     
     try {
       const priceToUse = selectedSize ? item?.price[selectedSize] : item?.price;
-      const baseName = item?.originalName || item?.name || 'منتج';
+      const resolvedName = item?.originalName || item?.name || (language === 'ar' ? item?.name_ar : item?.name_en) || item?.name_en || 'منتج';
+      const baseName = resolvedName;
       const nameToUse = selectedSize ? `${baseName.replace(/\s\([^)]+\)$/, '')} (${selectedSize})` : baseName;
 
       // 1. Prepare item with safe defaults
@@ -106,7 +110,7 @@ export default function ProductModal({
         id: item?.id || Date.now(),
         originalName: baseName,
         name: nameToUse,
-        price: Number(priceToUse) || 0,
+        price: parseFloat(priceToUse) || 0,
         selectedSize: selectedSize || 'عادي',
         selectedSpiciness: selectedSpiciness || 'عادي',
         selectedSauces: Array.isArray(selectedSauces) ? selectedSauces : [],
@@ -145,9 +149,16 @@ export default function ProductModal({
   return createPortal(
     <div onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', zIndex: 9999, padding: '1rem', overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div onClick={(e) => e.stopPropagation()} className="scale-in" style={{ backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px', position: 'relative', border: '2px solid var(--brand-red)', margin: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.8)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.3s', zIndex: 10 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--brand-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
-          <X size={28} />
+        <button onClick={onClose} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', border: 'none', color: '#fff', borderRadius: '50%', cursor: 'pointer', transition: 'background 0.3s', zIndex: 10 }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--brand-red)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.5)'}>
+          <X size={20} />
         </button>
+
+        {item.img && (
+          <div style={{ margin: '-2rem -2rem 1.5rem -2rem', height: '220px', borderRadius: '10px 10px 0 0', overflow: 'hidden', position: 'relative' }}>
+            <img src={item.img} alt={item.name_en || item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(to top, var(--card-bg) 0%, transparent 100%)' }}></div>
+          </div>
+        )}
 
         <div style={{ paddingRight: '3rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           <h2 style={{ margin: 0, color: 'var(--gold)', fontSize: 'clamp(1.8rem, 5vw, 2.4rem)', fontWeight: '900', lineHeight: 1.2 }}>
@@ -249,6 +260,42 @@ export default function ProductModal({
                   </button>
                 );
               })}
+            </div>
+            
+            {/* General Sauces Banner */}
+            <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'rgba(229,185,66,0.08)', borderRadius: '10px', border: '1px dashed var(--gold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h5 style={{ margin: '0 0 0.3rem', color: 'var(--text-primary)', fontSize: '1rem' }}>
+                  {language === 'ar' ? 'عايز صوص مش موجود هنا؟' : 'Want a sauce not listed here?'}
+                </h5>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  {language === 'ar' ? 'تصفح قسم الصوصات والإضافات لإضافة المزيد لطلبك' : 'Browse our Sauces & Extras section for more'}
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClose();
+                  // Dispatch event to close cart if it's open
+                  window.dispatchEvent(new CustomEvent('forceCloseCart'));
+                  // Dispatch event to Menu.jsx in case we are already there
+                  window.dispatchEvent(new CustomEvent('navigateToCategory', { detail: 'sauces' }));
+                  // Always route to menu with the query param for safety
+                  navigate('/menu?category=sauces');
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  backgroundColor: 'var(--gold)', color: '#000',
+                  border: 'none', padding: '0.6rem 1.2rem', borderRadius: '25px',
+                  fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                {language === 'ar' ? 'الذهاب للصوصات' : 'Go to Extras'}
+                {language === 'ar' ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+              </button>
             </div>
           </div>
         )}
