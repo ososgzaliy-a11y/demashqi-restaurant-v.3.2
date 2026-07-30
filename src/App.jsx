@@ -13,6 +13,8 @@ import Chef from './pages/Chef';
 import Events from './pages/Events';
 import Testimonials from './pages/Testimonials';
 import Management from './pages/Management';
+import CheckoutPayment from './pages/CheckoutPayment';
+import PaymobCallback from './pages/PaymobCallback';
 
 import { CartProvider } from './context/CartContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -73,6 +75,8 @@ function App() {
               <Route path="/testimonials" element={<Testimonials />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/management" element={<Management />} />
+              <Route path="/checkout/payment" element={<CheckoutPayment />} />
+              <Route path="/checkout/callback" element={<PaymobCallback />} />
               <Route path="/track" element={<OrderTracking />} />
               <Route path="*" element={
                 <div style={{ padding: '12rem 2rem', textAlign: 'center', minHeight: '60vh' }}>

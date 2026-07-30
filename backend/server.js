@@ -97,6 +97,165 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
+const crypto = require('crypto');
+
+// Paymob API Endpoints
+app.post('/api/payment/paymob', async (req, res) => {
+  try {
+    const { total, address, phone, name, items, orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'orderId is required' });
+    }
+    const amount_cents = Math.round(total * 100);
+
+    // 1. Authentication
+    const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: process.env.PAYMOB_API_KEY })
+    });
+    if (!authRes.ok) {
+        const errText = await authRes.text();
+        console.error('Paymob Authentication error:', errText);
+        throw new Error(`Paymob Authentication failed: ${errText}`);
+    }
+    const authData = await authRes.json();
+    const token = authData.token;
+
+    // 2. Order Registration
+    const orderRes = await fetch('https://accept.paymob.com/api/ecommerce/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_token: token,
+        delivery_needed: 'false',
+        amount_cents,
+        currency: 'EGP',
+        merchant_order_id: orderId.toString(),
+        items: items.map(item => ({
+          name: item.name,
+          amount_cents: Math.round(item.price * 100),
+          description: item.name,
+          quantity: item.quantity
+        }))
+      })
+    });
+    if (!orderRes.ok) {
+        const err = await orderRes.text();
+        console.error('Paymob Order error:', err);
+        throw new Error(`Paymob Order registration failed: ${err}`);
+    }
+    const orderData = await orderRes.json();
+    const paymob_order_id = orderData.id;
+
+    // 3. Payment Key Request
+    const nameParts = (name || 'Customer').trim().split(' ');
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Customer';
+
+    const billingData = {
+      apartment: "NA", 
+      email: "customer@demashqi.com", 
+      floor: "NA", 
+      first_name: firstName, 
+      street: address || "NA", 
+      building: "NA", 
+      phone_number: phone || "+201000000000", 
+      shipping_method: "NA", 
+      postal_code: "NA", 
+      city: "NA", 
+      country: "EG", 
+      last_name: lastName, 
+      state: "NA"
+    };
+
+    const keyRes = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_token: token,
+        amount_cents,
+        expiration: 3600,
+        order_id: paymob_order_id,
+        billing_data: billingData,
+        currency: 'EGP',
+        integration_id: parseInt(process.env.PAYMOB_INTEGRATION_ID)
+      })
+    });
+    if (!keyRes.ok) {
+        const err = await keyRes.text();
+        console.error('Paymob Payment Key error:', err);
+        throw new Error(`Paymob Payment Key request failed: ${err}`);
+    }
+    const keyData = await keyRes.json();
+
+    const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${process.env.PAYMOB_IFRAME_ID}?payment_token=${keyData.token}`;
+
+    res.json({ success: true, paymentKey: keyData.token, iframeUrl });
+  } catch (error) {
+    console.error('Paymob backend error:', error.message || error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+app.post('/api/payment/webhook', (req, res) => {
+  const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
+  const receivedHmac = req.query.hmac;
+  const obj = req.body.obj;
+  
+  if (!obj) return res.status(400).send('No object provided');
+
+  // Paymob HMAC string concatenation order (strict alphabetical order)
+  const amount_cents = obj.amount_cents;
+  const created_at = obj.created_at;
+  const currency = obj.currency;
+  const error_occured = obj.error_occured;
+  const has_parent_transaction = obj.has_parent_transaction;
+  const id = obj.id;
+  const integration_id = obj.integration_id;
+  const is_3d_secure = obj.is_3d_secure;
+  const is_auth = obj.is_auth;
+  const is_capture = obj.is_capture;
+  const is_refunded = obj.is_refunded;
+  const is_standalone_payment = obj.is_standalone_payment;
+  const is_voided = obj.is_voided;
+  const order_id = obj.order.id;
+  const owner = obj.owner;
+  const pending = obj.pending;
+  const source_data_pan = obj.source_data.pan;
+  const source_data_sub_type = obj.source_data.sub_type;
+  const source_data_type = obj.source_data.type;
+  const success = obj.success;
+
+  const hmacString = `${amount_cents}${created_at}${currency}${error_occured}${has_parent_transaction}${id}${integration_id}${is_3d_secure}${is_auth}${is_capture}${is_refunded}${is_standalone_payment}${is_voided}${order_id}${owner}${pending}${source_data_pan}${source_data_sub_type}${source_data_type}${success}`;
+  
+  const calculatedHmac = crypto.createHmac('sha512', hmacSecret).update(hmacString).digest('hex');
+
+  if (calculatedHmac !== receivedHmac) {
+    console.error('Paymob HMAC validation failed');
+    return res.status(401).send('Unauthorized');
+  }
+
+  const merchantOrderId = obj.order.merchant_order_id;
+  
+  if (typeof merchantOrderId === 'string' && merchantOrderId.startsWith('temp_')) {
+    console.log(`Paymob Webhook received for temp order ${merchantOrderId}. Waiting for frontend to create the order.`);
+    return res.status(200).send('OK');
+  }
+
+  if (success) {
+    db.run("UPDATE orders SET status = 'preparing' WHERE id = ?", [merchantOrderId], (err) => {
+      if (err) console.error("Error updating order:", err);
+    });
+  } else {
+    db.run("UPDATE orders SET status = 'cancelled' WHERE id = ?", [merchantOrderId], (err) => {
+      if (err) console.error("Error cancelling order:", err);
+    });
+  }
+
+  res.status(200).send('OK');
+});
+
 app.post('/api/reservations', (req, res, next) => {
   try {
     const data = reservationSchema.parse(req.body);
@@ -142,8 +301,8 @@ app.post('/api/orders', (req, res, next) => {
     const data = orderSchema.parse(req.body);
     const createdAt = Date.now();
     const dailyId = data.daily_id || 1;
-    const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod, created_at, daily_id, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod, createdAt, dailyId, data.name || 'Unknown Customer'], function(err) {
+    const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod, created_at, daily_id, name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod, createdAt, dailyId, data.name || 'Unknown Customer', 'preparing'], function(err) {
       if (err) {
         return next(err);
       }
@@ -237,15 +396,48 @@ app.delete('/api/admin/products/:id', (req, res, next) => {
   });
 });
 
-// Admin Login
+// Generic Login for Future Roles
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  db.get('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (row) {
+      res.json({ success: true, role: row.role, token: `token-for-${row.role}` });
+    } else {
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  });
+});
+
+// Admin Login (Legacy check + DB check)
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   if (password === adminPassword || password === 'admin' || password === '1234') {
     res.json({ success: true, token: 'authenticated-admin-token' });
   } else {
-    res.status(401).json({ error: 'Invalid password' });
+    // Check db just in case
+    db.get("SELECT * FROM users WHERE role = 'admin' AND password = ?", [password], (err, row) => {
+      if (row) {
+        res.json({ success: true, token: 'authenticated-admin-token' });
+      } else {
+        res.status(401).json({ error: 'Invalid password' });
+      }
+    });
   }
+});
+
+// Manager Password Verification Gate
+app.post('/api/manager/verify', (req, res) => {
+  const { password } = req.body;
+  db.get("SELECT * FROM users WHERE role = 'manager' AND password = ?", [password], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (row) {
+      res.json({ success: true });
+    } else {
+      res.status(401).json({ error: 'Invalid manager password' });
+    }
+  });
 });
 
 // Admin Get Orders

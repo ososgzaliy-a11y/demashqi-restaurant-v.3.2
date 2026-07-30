@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { PlusCircle, Pencil, Trash2, X, Plus, Minus } from 'lucide-react';
+import ManagerAuthModal from './ManagerAuthModal';
 
 const EMPTY = {
   id: null, category_key: '', key: '', name_en: '', name_ar: '',
@@ -21,6 +22,7 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
   const [formData, setFormData] = useState(EMPTY);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [authModal, setAuthModal] = useState({ isOpen: false, actionLabel: '', pendingAction: null });
 
   useEffect(() => {
     if (showCancelModal) {
@@ -119,8 +121,16 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
     return obj;
   };
 
-  const handleSubmit = async (e) => {
+  const confirmSubmit = (e) => {
     e.preventDefault();
+    setAuthModal({
+      isOpen: true,
+      actionLabel: formData.id ? lbl('تعديل منتج', 'Edit Product') : lbl('إضافة منتج', 'Add Product'),
+      pendingAction: executeSubmit
+    });
+  };
+
+  const executeSubmit = async () => {
     setLoading(true);
     let finalKey = formData.key;
     if (!finalKey) {
@@ -164,11 +174,19 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(lbl('Delete this product?', 'هل تريد حذف هذا المنتج؟'))) return;
+  const confirmDelete = (id) => {
+    setAuthModal({
+      isOpen: true,
+      actionLabel: lbl('حذف منتج', 'Delete Product'),
+      pendingAction: () => executeDelete(id)
+    });
+  };
+
+  const executeDelete = async (id) => {
     try {
       await fetch(`${API}/api/admin/products/${id}`, { method: 'DELETE' });
       fetchData();
+      if (showToast) showToast(lbl('Product deleted', 'تم حذف المنتج'));
     } catch (err) { console.error(err); }
   };
 
@@ -210,13 +228,13 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* ── FORM ── */}
-      <div style={{ backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-        <h3 style={{ marginBottom: '1.5rem', color: 'var(--gold)' }}>
-          {formData.id ? lbl('✏️ Edit Product', '✏️ تعديل منتج') : lbl('➕ Add Product', '➕ إضافة منتج')}
-        </h3>
+      {/* Form Section */}
+      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: 'clamp(1rem, 3vw, 2rem)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+        <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', color: 'var(--gold)' }}>
+          {formData.id ? lbl('تعديل منتج', 'Edit Product') : lbl('إضافة منتج جديد', 'Add New Product')}
+        </h2>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={confirmSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: '1rem' }}>
 
             {/* Category */}
@@ -440,6 +458,16 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
         document.body
       )}
 
+      <ManagerAuthModal
+        isOpen={authModal.isOpen}
+        actionLabel={authModal.actionLabel}
+        onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+        onSuccess={() => {
+          if (authModal.pendingAction) authModal.pendingAction();
+          setAuthModal(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
+
       {/* ── TABLE ── */}
       <div className="table-responsive" style={{ backgroundColor: 'var(--card-bg)', padding: '1.8rem', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -483,8 +511,19 @@ export default function AdminProducts({ products, categories, fetchData, API, sh
                     <button onClick={() => handleEdit(prod)} style={{ padding: '0.35rem 0.7rem', backgroundColor: 'rgba(229,185,66,0.15)', color: 'var(--gold)', border: '1px solid var(--gold)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}>
                       <Pencil size={13} /> {lbl('Edit', 'تعديل')}
                     </button>
-                    <button onClick={() => handleDelete(prod.id)} style={{ padding: '0.35rem 0.7rem', backgroundColor: 'rgba(200,16,46,0.15)', color: 'var(--brand-red)', border: '1px solid var(--brand-red)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}>
-                      <Trash2 size={13} /> {lbl('Delete', 'حذف')}
+                    <button 
+                      onClick={() => confirmDelete(prod.id)}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        color: 'var(--brand-red)',
+                        borderRadius: '8px',
+                        padding: '0.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    > <Trash2 size={13} /> {lbl('Delete', 'حذف')}
                     </button>
                   </div>
                 </td>

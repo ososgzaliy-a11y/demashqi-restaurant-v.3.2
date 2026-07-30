@@ -115,6 +115,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
           if (!err) console.log('Migrated products table: added offer_type');
         });
       });
+
+      // Users table for role-based access
+      db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL
+      )`, () => {
+        // Seed default users if empty
+        db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
+          if (!err && row.count === 0) {
+            const stmt = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)');
+            stmt.run(['admin', 'admin123', 'admin']);
+            stmt.run(['manager', 'manager123', 'manager']);
+            stmt.run(['delivery', 'delivery123', 'delivery']);
+            stmt.run(['client', 'client123', 'client']);
+            stmt.finalize();
+            console.log('Seeded default users (admin, manager, delivery, client)');
+          }
+        });
+      });
     });
   }
 });

@@ -158,7 +158,7 @@ export default function Home() {
                     <span style={{ color: 'var(--gold)', fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0, marginLeft: '0.5rem' }}>{dish.displayPrice}</span>
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>{language === 'ar' ? dish.desc_ar : dish.desc_en}</p>
-                  
+
                   <button
                     className="order-btn"
                     style={{ width: '100%', marginTop: '0.5rem' }}
@@ -181,16 +181,16 @@ export default function Home() {
 
 
 
-    {selectedProduct && (
-      <ProductModal
-        item={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-        onSave={(cartItem, qty) => {
-          addToCart(cartItem, qty);
-          setSelectedProduct(null);
-        }}
-      />
-    )}
+      {selectedProduct && (
+        <ProductModal
+          item={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onSave={(cartItem, qty) => {
+            addToCart(cartItem, qty);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 }

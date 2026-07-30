@@ -48,6 +48,71 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
   const [isSubmittingState, setIsSubmittingState] = useState(false);
   const isSubmittingRef = React.useRef(false);
 
+  // Paymob In-Page States
+  const [paymobIframeUrl, setPaymobIframeUrl] = useState(null);
+  const [fetchingPaymob, setFetchingPaymob] = useState(false);
+  
+  // Listen for Paymob Iframe Callback Message
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'PAYMOB_RESULT') {
+        if (event.data.success) {
+          createOrderInDB(true);
+        } else {
+          setStatus({ type: 'error', message: language === 'ar' ? 'فشلت عملية الدفع. يرجى مراجعة بيانات البطاقة والمحاولة مرة أخرى.' : 'Payment failed. Please review your card details and try again.' });
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [cart, formData, cartTotal, language]);
+
+  // Fetch Iframe URL when Credit Card is selected
+  useEffect(() => {
+    if (formData.paymentMethod === 'credit_card' && !paymobIframeUrl && !fetchingPaymob) {
+      setFetchingPaymob(true);
+      const tempOrderId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      
+      let addressParts = [formData.street];
+      if (formData.building) addressParts.push(`${language === 'ar' ? 'مبنى' : 'Building'} ${formData.building}`);
+      if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
+      const addressStr = addressParts.join(', ');
+
+      fetch(`${API}/api/payment/paymob`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: tempOrderId,
+          total: cartTotal,
+          items: cart,
+          name: formData.name,
+          address: addressStr,
+          phone: formData.phone
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.paymentKey) {
+          setPaymobIframeUrl(`https://accept.paymob.com/api/acceptance/iframes/1064976?payment_token=${data.paymentKey}`);
+        } else if (data.success && data.iframeUrl) {
+          setPaymobIframeUrl(data.iframeUrl);
+        } else {
+          setStatus({ type: 'error', message: language === 'ar' ? 'حدث خطأ في تجهيز الدفع' : 'Error preparing payment' });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setStatus({ type: 'error', message: language === 'ar' ? 'خطأ في الاتصال بخادم الدفع' : 'Payment server error' });
+      })
+      .finally(() => {
+        setFetchingPaymob(false);
+      });
+    } else if (formData.paymentMethod !== 'credit_card') {
+      setPaymobIframeUrl(null);
+    }
+  }, [formData.paymentMethod]); // Only refetch if they toggle payment methods, to prevent constant iframe reloading on typing
+
+
   const closeSuccessModal = () => {
     if (setStatus) setStatus({ type: '', message: '' });
   };
@@ -107,12 +172,11 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     setConfirmCountdown(5);
   };
 
-  const proceedCheckout = async () => {
-    if (isSubmittingRef.current) return;
+  const createOrderInDB = async (isPaidByCard = false) => {
+    if (isSubmittingRef.current && !isPaidByCard) return;
     isSubmittingRef.current = true;
     setIsSubmittingState(true);
     
-    setShowConfirmModal(false);
     setStatus({ type: 'loading', message: t.processing });
     let addressParts = [formData.street];
     if (formData.building) addressParts.push(`${language === 'ar' ? 'مبنى' : 'Building'} ${formData.building}`);
@@ -159,6 +223,11 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
       isSubmittingRef.current = false;
       setIsSubmittingState(false);
     }
+  };
+
+  const proceedCheckout = () => {
+    setShowConfirmModal(false);
+    createOrderInDB(false);
   };
 
   const handleChange = (e) => {
@@ -259,16 +328,21 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           <CreditCard size={24} /> {language === 'ar' ? '٢.' : '2.'} {t.paymentTitle}
         </h3>
 
-        <div className="responsive-flex" style={{ marginBottom: '2rem' }}>
-          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'vodafone_cash' ? 'rgba(200, 16, 46, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+        <div className="responsive-flex" style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'vodafone_cash' ? 'rgba(200, 16, 46, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
             <input type="radio" name="paymentMethod" value="vodafone_cash" checked={formData.paymentMethod === 'vodafone_cash'} onChange={handleChange} style={{ display: 'none' }} />
             <Smartphone size={32} color={formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--text-secondary)'} />
-            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--text-secondary)' }}>{t.vodafoneCash}</span>
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--text-secondary)', textAlign: 'center' }}>{t.vodafoneCash}</span>
           </label>
-          <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'cash' ? 'rgba(255, 215, 0, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'cash' ? 'rgba(255, 215, 0, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
             <input type="radio" name="paymentMethod" value="cash" checked={formData.paymentMethod === 'cash'} onChange={handleChange} style={{ display: 'none' }} />
             <Banknote size={32} color={formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)'} />
-            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)' }}>{t.anyCash}</span>
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)', textAlign: 'center' }}>{t.anyCash}</span>
+          </label>
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'credit_card' ? 'rgba(40, 167, 69, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+            <input type="radio" name="paymentMethod" value="credit_card" checked={formData.paymentMethod === 'credit_card'} onChange={handleChange} style={{ display: 'none' }} />
+            <CreditCard size={32} color={formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--text-secondary)'} />
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'الدفع ببطاقة بنكية' : 'Credit Card'}</span>
           </label>
         </div>
 
@@ -283,9 +357,29 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
             {t.cashNote}
           </div>
         )}
-      </div>
 
-      {status.type !== 'success' && (
+        {formData.paymentMethod === 'credit_card' && (
+          <div className="fade-in" style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid #28a745', textAlign: 'center', width: '100%' }}>
+            {fetchingPaymob ? (
+              <div style={{ color: 'var(--text-primary)' }}>{language === 'ar' ? 'جاري تجهيز بوابة الدفع...' : 'Preparing payment gateway...'}</div>
+            ) : paymobIframeUrl ? (
+              <div style={{ width: '100%', height: '650px', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+                <iframe 
+                  src={paymobIframeUrl}
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  title="Paymob Payment Gateway"
+                  allow="payment"
+                />
+              </div>
+            ) : (
+               <div style={{ color: 'var(--brand-red)' }}>{language === 'ar' ? 'تعذر جلب بوابة الدفع. يرجى التأكد من البيانات أو اختيار طريقة أخرى.' : 'Could not fetch payment gateway. Please check details or choose another method.'}</div>
+            )}
+          </div>
+        )}
+      </div>
+      {status.type !== 'success' && formData.paymentMethod !== 'credit_card' && (
         <button type="submit" className="btn-primary" style={{ padding: '1.5rem', fontSize: '1.2rem', borderRadius: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '1rem' }} disabled={status.type === 'loading'}>
           {status.type === 'loading' ? t.processing : t.confirmBtn}
         </button>

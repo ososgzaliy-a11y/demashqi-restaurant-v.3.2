@@ -10,7 +10,7 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isVisible, setIsVisible] = useState(true);
-  const [isPausedForDelay, setIsPausedForDelay] = useState(false);
+  const [isPausedForDelay, setIsPausedForDelay] = useState(true);
   const intervalRef = useRef(null);
   const delayTimeoutRef = useRef(null);
   const isAutoScrollingRef = useRef(false);
@@ -38,10 +38,18 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
     setActiveIndex(prev => (prev - 1 + offerItems.length) % offerItems.length);
   }, [offerItems.length]);
 
-  // Smart Auto-play with 3.5s spotlight per slide
+  // Initial delay before autoplay starts
+  useEffect(() => {
+    const initialDelay = setTimeout(() => {
+      setIsPausedForDelay(false);
+    }, 5000);
+    return () => clearTimeout(initialDelay);
+  }, []);
+
+  // Smart Auto-play
   useEffect(() => {
     if (offerItems.length === 0 || isHovered || isPausedForDelay || !isVisible) return;
-    intervalRef.current = setInterval(goToNext, 3500);
+    intervalRef.current = setInterval(goToNext, 2000);
     return () => clearInterval(intervalRef.current);
   }, [isHovered, isPausedForDelay, isVisible, goToNext, offerItems.length]);
 
@@ -70,22 +78,38 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
     const cards = containerRef.current.querySelectorAll('.offer-card');
     const card = cards[activeIndex];
     if (card) {
-      const container = containerRef.current;
-      const scrollPos = card.offsetLeft - container.offsetLeft - (container.clientWidth / 2) + (card.clientWidth / 2);
-      container.scrollTo({ left: scrollPos, behavior: 'smooth' });
+      card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
-    isAutoScrollingRef.current = false; // Reset after auto-scroll
+    
+    // Keep flag true during the scroll animation to prevent handleScroll from fighting it
+    const timeoutId = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
   }, [activeIndex, isHovered]);
 
   const handleScroll = (e) => {
-    // We update activeIndex natively without fighting the scroll, to let momentum work
+    if (isAutoScrollingRef.current) return; // Don't fight programmatic scroll
+    
     const container = e.target;
-    const scrollLeft = container.scrollLeft;
-    const cardWidth = 260 + 24; // width + gap approx
-    let newIndex = Math.round(scrollLeft / cardWidth);
-    if (newIndex < 0) newIndex = 0;
-    if (newIndex >= offerItems.length) newIndex = offerItems.length - 1;
-    setActiveIndex(newIndex);
+    const cards = container.querySelectorAll('.offer-card');
+    if (cards.length === 0) return;
+    
+    let closestIndex = 0;
+    let minDiff = Infinity;
+    const containerCenter = container.getBoundingClientRect().left + container.offsetWidth / 2;
+
+    cards.forEach((card, index) => {
+      const cardCenter = card.getBoundingClientRect().left + card.offsetWidth / 2;
+      const diff = Math.abs(containerCenter - cardCenter);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = index;
+      }
+    });
+
+    setActiveIndex(prev => prev === closestIndex ? prev : closestIndex);
   };
 
   const handleInteractionStart = () => {
@@ -205,7 +229,7 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
                   // Skip/Slide Transition effect
                   transform: isActive ? 'scale(1.05)' : 'scale(1)',
                   opacity: isActive ? 1 : 0.7,
-                  transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   cursor: 'pointer',
                   zIndex: isActive ? 2 : 1,
                   position: 'relative',
@@ -245,7 +269,7 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
                 )}
 
                 <div style={{ position: 'relative', zIndex: 1 }}>
-                  <h4 style={{ margin: '0 0 0.5rem', color: isActive ? 'var(--gold)' : '#fff', fontSize: '1.1rem', transition: 'color 0.4s ease' }}>
+                  <h4 style={{ margin: '0 0 0.5rem', color: isActive ? 'var(--gold)' : '#fff', fontSize: '1.1rem', transition: 'color 0.2s ease' }}>
                     {language === 'ar' ? item.name_ar : item.name_en}
                   </h4>
                   <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
@@ -264,7 +288,7 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
                     color: isActive ? '#000' : 'var(--gold)',
                     borderRadius: '20px',
                     fontWeight: 'bold',
-                    transition: 'all 0.4s ease'
+                    transition: 'all 0.2s ease'
                   }}>
                     {language === 'ar' ? 'اطلب الآن' : 'Order Now'}
                   </span>
@@ -277,14 +301,13 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
         {/* Navigation Dots and Arrows */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '0.5rem' }}>
           <button 
-            onClick={() => setActiveIndex(prev => Math.max(0, prev - 1))}
+            onClick={goToPrev}
             style={{ 
               background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', 
               width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              color: 'var(--text-secondary)', cursor: activeIndex === 0 ? 'not-allowed' : 'pointer',
-              opacity: activeIndex === 0 ? 0.3 : 1
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              opacity: 1
             }}
-            disabled={activeIndex === 0}
           >
             {isRTL ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
@@ -311,14 +334,13 @@ export default function OffersSlider({ products, items, onItemClick, title }) {
           </div>
           
           <button 
-            onClick={() => setActiveIndex(prev => Math.min(offerItems.length - 1, prev + 1))}
+            onClick={goToNext}
             style={{ 
               background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', 
               width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              color: 'var(--text-secondary)', cursor: activeIndex === offerItems.length - 1 ? 'not-allowed' : 'pointer',
-              opacity: activeIndex === offerItems.length - 1 ? 0.3 : 1
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              opacity: 1
             }}
-            disabled={activeIndex === offerItems.length - 1}
           >
             {isRTL ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>

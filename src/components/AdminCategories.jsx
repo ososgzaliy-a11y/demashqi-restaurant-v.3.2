@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { PlusCircle, Pencil, Trash2, X } from 'lucide-react';
+import ManagerAuthModal from './ManagerAuthModal';
 
 const EMPTY = { id: null, key: '', name_en: '', name_ar: '', img: '', desc_en: '', desc_ar: '' };
 
@@ -12,6 +13,7 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
   const [formData, setFormData] = useState(EMPTY);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [authModal, setAuthModal] = useState({ isOpen: false, actionLabel: '', pendingAction: null });
 
   useEffect(() => {
     if (showCancelModal) {
@@ -67,8 +69,16 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
     setFormData(prev => ({ ...prev, img: '' }));
   };
 
-  const handleSubmit = async (e) => {
+  const confirmSubmit = (e) => {
     e.preventDefault();
+    setAuthModal({
+      isOpen: true,
+      actionLabel: formData.id ? lbl('تعديل قسم', 'Edit Category') : lbl('إضافة قسم', 'Add Category'),
+      pendingAction: executeSubmit
+    });
+  };
+
+  const executeSubmit = async () => {
     setLoading(true);
     const method = formData.id ? 'PUT' : 'POST';
     const url = formData.id
@@ -90,11 +100,19 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(lbl('Delete this category?', 'هل أنت متأكد من حذف هذا القسم؟'))) return;
+  const confirmDelete = (id) => {
+    setAuthModal({
+      isOpen: true,
+      actionLabel: lbl('حذف قسم', 'Delete Category'),
+      pendingAction: () => executeDelete(id)
+    });
+  };
+
+  const executeDelete = async (id) => {
     try {
       await fetch(`${API}/api/admin/categories/${id}`, { method: 'DELETE' });
       fetchData();
+      if (showToast) showToast(lbl('Category deleted', 'تم حذف القسم'));
     } catch (err) {
       console.error(err);
     }
@@ -119,7 +137,7 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
         <h3 style={{ marginBottom: '1.5rem', color: 'var(--gold)' }}>
           {formData.id ? lbl('✏️ Edit Category', '✏️ تعديل القسم') : lbl('➕ Add Category', '➕ إضافة قسم')}
         </h3>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={confirmSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
               {lbl('Key (slug, e.g. shawarma)', 'المفتاح الداخلي (slug)')}
@@ -203,6 +221,16 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
         </form>
       </div>
 
+      <ManagerAuthModal
+        isOpen={authModal.isOpen}
+        actionLabel={authModal.actionLabel}
+        onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
+        onSuccess={() => {
+          if (authModal.pendingAction) authModal.pendingAction();
+          setAuthModal(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
+
       {showCancelModal && createPortal(
         <div style={{
           position: 'fixed', inset: 0,
@@ -283,9 +311,20 @@ export default function AdminCategories({ categories, fetchData, API, showToast 
                       style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(229,185,66,0.15)', color: 'var(--gold)', border: '1px solid var(--gold)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Pencil size={14} /> {lbl('Edit', 'تعديل')}
                     </button>
-                    <button onClick={() => handleDelete(cat.id)}
-                      style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(200,16,46,0.15)', color: 'var(--brand-red)', border: '1px solid var(--brand-red)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Trash2 size={14} /> {lbl('Delete', 'حذف')}
+                    <button 
+                      onClick={() => confirmDelete(cat.id)}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        color: 'var(--brand-red)',
+                        borderRadius: '8px',
+                        padding: '0.4rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </td>
