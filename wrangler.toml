@@ -1,6 +1,6 @@
 name = "demashqi-restaurant-backend"
 main = "backend/worker.js"
-compatibility_date = "2024-04-01"
+compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
@@ -9,4 +9,4 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB" # Available in your worker as env.DB
 database_name = "demashqi-db"
-database_id = "paste-your-d1-id-here"
+database_id = "a4fe78eb-6ac4-434c-8c59-9831f687ced1"

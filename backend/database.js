@@ -65,7 +65,7 @@ const db = {
 };
 
 if (sqlite3 && process.env.NODE_ENV !== 'cloudflare') {
-  const dbPath = path.resolve(__dirname, 'demashqi.db');
+  const dbPath = typeof __dirname !== 'undefined' ? path.resolve(__dirname, 'demashqi.db') : 'demashqi.db';
   localDb = new sqlite3.Database(dbPath, (err) => {
     if (err) console.error('Error opening local database', err);
     else {
