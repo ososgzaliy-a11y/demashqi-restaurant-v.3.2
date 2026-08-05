@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
@@ -564,17 +565,28 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Serve Frontend Static Files
-app.use(express.static(path.join(__dirname, '../dist')));
+// Serve Frontend Static Files (if dist exists)
+const distPath = path.join(__dirname, '../dist');
+if (fs.existsSync(distPath)) {
+  console.log('Serving frontend from:', distPath);
+  app.use(express.static(distPath));
+  // Fallback to React Router for all non-API routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    const indexFile = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      res.sendFile(indexFile);
+    } else {
+      res.status(200).send('<h2>Building... Please refresh in a few seconds.</h2>');
+    }
+  });
+} else {
+  console.warn('WARNING: dist/ folder not found. Only API routes are available.');
+  app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Demashqi Restaurant API is running. Frontend not built yet.' });
+  });
+}
 
-// Fallback to React Router for all other non-API routes
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(__dirname, '../dist', 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend server running on port ${PORT}`);
 });
