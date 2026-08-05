@@ -1,143 +1,82 @@
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+let sqlite3;
+try {
+  sqlite3 = require('sqlite3').verbose();
+} catch (e) {
+  // Ignored in Cloudflare Workers
+}
 
-const dbPath = path.resolve(__dirname, 'demashqi.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database', err);
-  } else {
-    console.log('Database connected');
-    
-    db.serialize(() => {
-      // Enable WAL mode for better concurrency and set a busy timeout
-      db.run("PRAGMA journal_mode = WAL;");
-      db.run("PRAGMA busy_timeout = 5000;");
+let dbInstance = null;
+let localDb = null;
 
-        db.run(`CREATE TABLE IF NOT EXISTS reservations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          email TEXT NOT NULL,
-          phone TEXT NOT NULL,
-          date TEXT NOT NULL,
-          time TEXT NOT NULL,
-          guests INTEGER NOT NULL,
-          tableId TEXT
-        )`, () => {
-          // Ensure phone column exists (in case table existed before migration)
-          db.run(`ALTER TABLE reservations ADD COLUMN phone TEXT NOT NULL DEFAULT ''`, (err) => {
-            if (err) {
-              // Ignore if column already exists
-            }
-          });
-          // Safe migration to add tableId if it doesn't exist
-          db.run(`ALTER TABLE reservations ADD COLUMN tableId TEXT;`, (err) => {
-            if (err) {
-              // Ignore error if column already exists (sqlite error 1 when column exists)
-            } else {
-              console.log('Migrated reservations table: added tableId');
-            }
-          });
-          // Migration: add status column for reservation tracking
-          db.run(`ALTER TABLE reservations ADD COLUMN status TEXT DEFAULT 'pending';`, (err) => {
-            if (err) {
-              // Ignore error if column already exists
-            } else {
-              console.log('Migrated reservations table: added status');
-            }
-          });
-        });
-      
-      db.run(`CREATE TABLE IF NOT EXISTS contacts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        message TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`);
-
-      db.run(`CREATE TABLE IF NOT EXISTS orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        items TEXT NOT NULL,
-        total INTEGER NOT NULL,
-        address TEXT NOT NULL,
-        paymentMethod TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`, () => {
-        db.run(`ALTER TABLE orders ADD COLUMN phone TEXT NOT NULL DEFAULT ''`, (err) => {});
-        db.run(`ALTER TABLE orders ADD COLUMN notes TEXT DEFAULT ''`, (err) => {});
-        db.run(`ALTER TABLE orders ADD COLUMN name TEXT DEFAULT ''`, (err) => {
-          if (!err) console.log('Migrated orders table: added name');
-        });
-        db.run(`ALTER TABLE orders ADD COLUMN archived_at INTEGER`, (err) => {
-          if (!err) console.log('Migrated orders table: added archived_at');
-        });
-        db.run(`ALTER TABLE orders ADD COLUMN daily_id INTEGER`, (err) => {
-          if (!err) console.log('Migrated orders table: added daily_id');
-        });
-        db.run(`ALTER TABLE orders ADD COLUMN cancelled_by TEXT DEFAULT NULL`, (err) => {
-          if (!err) console.log('Migrated orders table: added cancelled_by');
-        });
+const db = {
+  serialize: (cb) => { if (cb) cb(); },
+  run: function(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (dbInstance) {
+      // Cloudflare D1 flow
+      dbInstance.prepare(sql).bind(...(params || [])).run().then(res => {
+        if (callback) callback.call({ changes: res.meta?.changes, lastID: res.meta?.last_row_id }, null);
+      }).catch(err => { if (callback) callback(err); });
+    } else if (localDb) {
+      // Local SQLite flow
+      localDb.run(sql, params, function(err) {
+        if (callback) callback.call(this, err);
       });
+    }
+    return this;
+  },
+  all: function(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (dbInstance) {
+      dbInstance.prepare(sql).bind(...(params || [])).all().then(res => {
+        if (callback) callback(null, res.results);
+      }).catch(err => { if (callback) callback(err, []); });
+    } else if (localDb) {
+      localDb.all(sql, params, callback);
+    }
+    return this;
+  },
+  get: function(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (dbInstance) {
+      dbInstance.prepare(sql).bind(...(params || [])).first().then(res => {
+        if (callback) callback(null, res);
+      }).catch(err => { if (callback) callback(err, null); });
+    } else if (localDb) {
+      localDb.get(sql, params, callback);
+    }
+    return this;
+  },
+  prepare: function(sql) {
+    if (dbInstance) {
+      return {
+        run: (params, cb) => db.run(sql, params, cb),
+        get: (params, cb) => db.get(sql, params, cb),
+        all: (params, cb) => db.all(sql, params, cb),
+        finalize: () => {}
+      };
+    } else if (localDb) {
+      return localDb.prepare(sql);
+    }
+    return { run:()=>{}, get:()=>{}, all:()=>{}, finalize:()=>{} };
+  },
+  bindD1: (envDb) => { dbInstance = envDb; }
+};
 
-      db.run(`CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        name_en TEXT NOT NULL,
-        name_ar TEXT NOT NULL,
-        img TEXT,
-        desc_en TEXT,
-        desc_ar TEXT
-      )`, () => {
-        db.run(`ALTER TABLE categories ADD COLUMN img TEXT`, () => {});
-        db.run(`ALTER TABLE categories ADD COLUMN desc_en TEXT`, () => {});
-        db.run(`ALTER TABLE categories ADD COLUMN desc_ar TEXT`, () => {});
+if (sqlite3 && process.env.NODE_ENV !== 'cloudflare') {
+  const dbPath = path.resolve(__dirname, 'demashqi.db');
+  localDb = new sqlite3.Database(dbPath, (err) => {
+    if (err) console.error('Error opening local database', err);
+    else {
+      console.log('Local SQLite Database connected');
+      // Initialize local tables...
+      localDb.serialize(() => {
+        localDb.run("PRAGMA journal_mode = WAL;");
+        localDb.run("PRAGMA busy_timeout = 5000;");
       });
-
-      db.run(`CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category_key TEXT NOT NULL,
-        key TEXT UNIQUE NOT NULL,
-        name_en TEXT NOT NULL,
-        name_ar TEXT NOT NULL,
-        desc_en TEXT NOT NULL,
-        desc_ar TEXT NOT NULL,
-        price TEXT NOT NULL,
-        img TEXT,
-        weight TEXT,
-        sauces TEXT,
-        ingredients TEXT,
-        is_popular INTEGER DEFAULT 0,
-        offer_type TEXT DEFAULT 'none'
-      )`, () => {
-        // Safe migration to add offer_type if it doesn't exist
-        db.run(`ALTER TABLE products ADD COLUMN offer_type TEXT DEFAULT 'none';`, (err) => {
-          if (!err) console.log('Migrated products table: added offer_type');
-        });
-      });
-
-      // Users table for role-based access
-      db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL
-      )`, () => {
-        // Seed default users if empty
-        db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
-          if (!err && row.count === 0) {
-            const stmt = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)');
-            stmt.run(['owner', 'owner123', 'owner']);
-            stmt.run(['manager', 'manager123', 'manager']);
-            stmt.run(['delivery', 'delivery123', 'delivery']);
-            stmt.run(['client', 'client123', 'client']);
-            stmt.finalize();
-            console.log('Seeded default users (owner, manager, delivery, client)');
-          }
-        });
-      });
-    });
-  }
-});
+    }
+  });
+}
 
 module.exports = db;

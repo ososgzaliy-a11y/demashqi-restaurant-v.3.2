@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Navigation } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
 export const ReceiptTemplate = ({ order, isPreview = false }) => {
   if (!order || typeof order !== 'object') return null;
@@ -15,7 +16,7 @@ export const ReceiptTemplate = ({ order, isPreview = false }) => {
 
   try {
     return (
-      <div id="receipt-container" className={isPreview ? "preview-mode" : ""}>
+      <div id="receipt-container" className={isPreview ? "preview-mode" : ""} style={{ backgroundColor: '#ffffff', color: '#000000', padding: '15px' }}>
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
           <h2 style={{ margin: 0, fontSize: '18px' }}>مطعم الدمشقي</h2>
           <p style={{ margin: 0 }}>رقم الطلب: #{order?.orderId || order?.id || 'N/A'}</p>
@@ -80,19 +81,39 @@ export const ReceiptTemplate = ({ order, isPreview = false }) => {
 };
 
 const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled, setAutoPrintEnabled, language }) => {
+  const downloadReceiptPDF = () => {
+    const element = document.getElementById('printable-receipt-container');
+    if (!element) return;
+    
+    const opt = {
+      margin:       0,
+      filename:     `Order_${order?.orderId || order?.id || 'receipt'}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF:        { unit: 'mm', format: [80, 200], orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+      if (autoPrintEnabled) {
+        onClose();
+      }
+    });
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      if (autoPrintEnabled) {
-        setTimeout(() => {
-          onPrint();
-        }, 300);
+      if (autoPrintEnabled && order) {
+        const timer = setTimeout(() => {
+          downloadReceiptPDF();
+        }, 800);
+        return () => clearTimeout(timer);
       }
     }
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, autoPrintEnabled, onPrint]);
+  }, [isOpen, autoPrintEnabled, order]);
 
   if (!isOpen || !order) return null;
   
@@ -122,11 +143,27 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
             margin: 0;
             size: 80mm auto;
           }
+          #printable-receipt-container * {
+            color: #000000 !important;
+            background-color: #ffffff !important;
+          }
         }
       `}</style>
 
-      {/* Hidden container specifically for printing two copies (Kitchen & Accounting) */}
-      <div id="print-area" className="print-only">
+      {/* Dedicated Off-Screen Render Target for PDF Generation */}
+      <div 
+        id="printable-receipt-container" 
+        style={{ 
+          position: 'fixed', 
+          left: '-9999px', 
+          top: 0, 
+          width: '80mm', 
+          backgroundColor: '#ffffff', 
+          color: '#000000', 
+          padding: '10mm',
+          fontFamily: 'Arial, sans-serif'
+        }}
+      >
         <div style={{ textAlign: 'center', fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '5px' }}>نسخة المطبخ (Kitchen Copy)</div>
         <ReceiptTemplate order={order} isPreview={false} />
         <div style={{ margin: '20px 0', borderBottom: '2px dashed #000', height: '20px' }}></div>
@@ -171,7 +208,7 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
             {language === 'ar' ? 'طباعة تلقائية' : 'Auto-print'}
           </label>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={onPrint} className="btn-primary" style={{ flex: 1, padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={downloadReceiptPDF} className="btn-primary" style={{ flex: 1, padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
               <Navigation size={20} />
               {language === 'ar' ? 'طباعة / حفظ PDF' : 'Print / Save PDF'}
             </button>

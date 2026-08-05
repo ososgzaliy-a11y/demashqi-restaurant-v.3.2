@@ -1,0 +1,12 @@
+name = "demashqi-restaurant-backend"
+main = "backend/worker.js"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Add your Paymob and Stripe API Keys here via Cloudflare Dashboard or wrangler secret put
+
+[[d1_databases]]
+binding = "DB" # Available in your worker as env.DB
+database_name = "demashqi-db"
+database_id = "paste-your-d1-id-here"
