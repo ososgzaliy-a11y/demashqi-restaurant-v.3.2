@@ -21,7 +21,7 @@ export default function CheckoutPayment() {
   const isFailureCallback = searchParams.get('success') === 'false';
   const hasCallback = searchParams.has('success');
 
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
   const isCreatingOrderRef = React.useRef(false);
   const [orderFinalized, setOrderFinalized] = useState(false);
 

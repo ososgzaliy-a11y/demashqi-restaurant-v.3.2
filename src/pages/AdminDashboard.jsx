@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle, Trash2, Archive, Clock, DollarSign, TrendingUp, XCircle, Activity, Edit2, Plus, Eye, X } from 'lucide-react';
+import { Lock, ShoppingBag, Calendar, MessageSquare, RefreshCw, Filter, CheckCircle, AlertCircle, Trash2, Archive, Clock, DollarSign, TrendingUp, XCircle, Activity, Edit2, Plus, Eye, X, Printer } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import ReceiptPreviewModal from '../components/ReceiptPreviewModal';
 
 // ── Status Configuration ──────────────────────────────────────
 const ORDER_STATUSES = {
@@ -38,12 +40,28 @@ const Toast = ({ message, visible }) => (
     backgroundColor: 'rgba(34,197,94,0.95)', color: '#fff', fontWeight: '700',
     display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem',
     transform: visible ? 'translateY(0)' : 'translateY(120%)',
-    opacity: visible ? 1 : 0, transition: 'all 0.35s ease',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.4)'
+    opacity: visible ? 1 : 0, transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
   }}>
     <CheckCircle size={20} /> {message}
   </div>
 );
+
+// ── KPI Card Component ────────────────────────────────────────
+const KPICard = ({ title, value, icon, trend, trendDown, periodLabel }) => (
+  <div style={{ backgroundColor: 'var(--card-bg)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <h4 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 'bold' }}>{title}</h4>
+      <div style={{ padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>{icon}</div>
+    </div>
+    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#fff' }}>{value}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+      <span style={{ color: trendDown ? 'var(--brand-red)' : '#10b981', fontWeight: 'bold' }}>{trend}</span>
+      <span style={{ color: 'var(--text-secondary)' }}>vs last {periodLabel}</span>
+    </div>
+  </div>
+);
+
 
 // ── Styles ────────────────────────────────────────────────────
 const cardStyle = {
@@ -112,6 +130,27 @@ function AdminContent() {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [selectedOrderToPrint, setSelectedOrderToPrint] = useState(null);
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(() => {
+    return localStorage.getItem('demashqi_admin_autoprint') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('demashqi_admin_autoprint', autoPrintEnabled);
+  }, [autoPrintEnabled]);
+
+  const handlePrint = async () => {
+    window.print();
+    if (selectedOrderToPrint?.id) {
+      try {
+        await updateOrderStatus(selectedOrderToPrint.id, 'preparing');
+      } catch (err) {
+        console.error('Failed to sync status after print:', err);
+      }
+    }
+  };
+
   const [salesAnalytics, setSalesAnalytics] = useState(() => {
     try {
       const saved = localStorage.getItem('salesAnalytics');
@@ -145,7 +184,7 @@ function AdminContent() {
     setTimeout(() => setToast({ visible: false, message: '' }), 2500);
   };
 
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -484,8 +523,6 @@ function AdminContent() {
       </header>
 
       <section className="section container">
-        {/* Financial Analytics section removed for Staff/Admin - Restricted to Manager panel only */}
-
         {/* ── Navigation Tabs ────────────────────────────────── */}
         <div className="hide-scrollbar" style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {[
@@ -493,8 +530,6 @@ function AdminContent() {
             { key: 'archive', icon: <Archive size={20} />, label: isRTL ? 'أرشيف الطلبات' : 'Archive', count: archivedOrdersList.length },
             { key: 'reservations', icon: <Calendar size={20} />, label: isRTL ? 'الحجوزات' : 'Reservations', count: safeReservations.length },
             { key: 'contacts', icon: <MessageSquare size={20} />, label: isRTL ? 'الرسائل' : 'Messages', count: safeContacts.length },
-            { key: 'categories', icon: <Filter size={20} />, label: isRTL ? 'الأقسام' : 'Categories', count: safeCategories.length },
-            { key: 'products', icon: <ShoppingBag size={20} />, label: isRTL ? 'المنتجات' : 'Products', count: safeProducts.length },
           ].map(tab => (
             <button
               key={tab.key}
@@ -594,6 +629,31 @@ function AdminContent() {
                         >
                           <Trash2 size={16} /> {isRTL ? 'حذف' : 'Delete'}
                         </button>
+                        <button 
+                          onClick={() => {
+                            setSelectedOrderToPrint(order);
+                            setShowReceiptPreview(true);
+                          }}
+                          style={{
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            color: '#3B82F6',
+                            borderRadius: '8px',
+                            padding: '0.4rem 0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#3B82F6'; e.currentTarget.style.color = '#fff'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; e.currentTarget.style.color = '#3B82F6'; }}
+                        >
+                          <Printer size={16} />
+                          {isRTL ? 'طباعة' : 'Print'}
+                        </button>
                       </div>
                     </div>
 
@@ -622,7 +682,7 @@ function AdminContent() {
                           {Array.isArray(order.items) && order.items.map((item, i) => (
                             <li key={i} style={{ marginBottom: '0.8rem', lineHeight: '1.5' }}>
                               <div>
-                                <span style={{ fontWeight: '700', color: 'var(--brand-red)' }}>{item.quantity}x</span> {item.name}
+                                <span style={{ fontWeight: '700', color: 'var(--brand-red)' }}>{`${item.quantity || item.qty || 1}x`}</span> {item.name}
                                 <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>({item.price} EGP)</span>
                               </div>
                               {(item.selectedSpiciness || (item.selectedSauces && item.selectedSauces.length > 0)) && (
@@ -635,6 +695,11 @@ function AdminContent() {
                                   {item.selectedSauces && item.selectedSauces.length > 0 && (
                                     <span style={{ color: 'var(--gold)' }}>🧄 {item.selectedSauces.join('، ')}</span>
                                   )}
+                                </div>
+                              )}
+                              {item.specialNote && (
+                                <div style={{ fontSize: '0.85rem', color: '#EF4444', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                                  📝 ملاحظة: {item.specialNote}
                                 </div>
                               )}
                             </li>
@@ -744,7 +809,7 @@ function AdminContent() {
                             {Array.isArray(order.items) && order.items.map((item, i) => (
                               <li key={i} style={{ marginBottom: '0.6rem', fontSize: '0.9rem' }}>
                                 <div>
-                                  <span style={{ fontWeight: '700' }}>{item.quantity}x</span> {item.name}
+                                  <span style={{ fontWeight: '700' }}>{`${item.quantity || item.qty || 1}x`}</span> {item.name}
                                 </div>
                                 {(item.selectedSpiciness || (item.selectedSauces && item.selectedSauces.length > 0)) && (
                                   <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1.2rem', marginTop: '0.2rem', fontSize: '0.8rem', opacity: 0.8 }}>
@@ -756,6 +821,11 @@ function AdminContent() {
                                     {item.selectedSauces && item.selectedSauces.length > 0 && (
                                       <span style={{ color: 'var(--gold)' }}>🧄 {item.selectedSauces.join('، ')}</span>
                                     )}
+                                  </div>
+                                )}
+                                {item.specialNote && (
+                                  <div style={{ fontSize: '0.85rem', color: '#EF4444', fontStyle: 'italic', marginTop: '0.2rem', marginLeft: '1.2rem' }}>
+                                    📝 ملاحظة: {item.specialNote}
                                   </div>
                                 )}
                               </li>
@@ -857,26 +927,22 @@ function AdminContent() {
             )}
           </div>
         )}
-
-        {/* ═══════════════════════════════════════════════════════
-            TAB 4: CATEGORIES MANAGEMENT
-            ═══════════════════════════════════════════════════════ */}
-        {activeTab === 'categories' && (
-          <AdminCategories categories={data.categories} fetchData={fetchData} API={API} showToast={showToast} />
-        )}
-
-        {/* ═══════════════════════════════════════════════════════
-            TAB 5: PRODUCTS MANAGEMENT
-            ═══════════════════════════════════════════════════════ */}
-        {activeTab === 'products' && (
-          <AdminProducts products={data.products} categories={data.categories} fetchData={fetchData} API={API} showToast={showToast} />
-        )}
       </section>
+      {/* Receipt Preview Modal */}
+      <ReceiptPreviewModal
+        isOpen={showReceiptPreview}
+        onClose={() => setShowReceiptPreview(false)}
+        order={selectedOrderToPrint}
+        onPrint={handlePrint}
+        autoPrintEnabled={autoPrintEnabled}
+        setAutoPrintEnabled={setAutoPrintEnabled}
+        language={language}
+      />
     </div>
   );
 }
 
-export default function Admin(props) {
+export default function AdminDashboard(props) {
   return (
     <AdminErrorBoundary>
       <AdminContent {...props} />

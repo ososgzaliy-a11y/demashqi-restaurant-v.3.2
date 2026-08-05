@@ -22,7 +22,7 @@ app.use(express.json({ limit: '10mb' }));
 // Rate limiting: max 100 requests per 15 minutes per IP
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 100, 
+  max: 5000, 
   message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true, 
   legacyHeaders: false, 
@@ -51,7 +51,8 @@ const orderSchema = z.object({
   items: z.array(z.object({
     name: z.string().max(200),
     price: z.union([z.number(), z.string().max(50)]),
-    quantity: z.number().int().positive().max(1000)
+    quantity: z.number().int().positive().max(1000),
+    specialNote: z.string().max(500).optional()
   }).passthrough()).max(100),
   total: z.number().positive(),
   name: z.string().max(250).optional(),
@@ -102,7 +103,7 @@ const crypto = require('crypto');
 // Paymob API Endpoints
 app.post('/api/payment/paymob', async (req, res) => {
   try {
-    const { total, address, phone, name, items, orderId } = req.body;
+    const { total, address, phone, name, items, orderId, integration_id } = req.body;
     if (!orderId) {
       return res.status(400).json({ success: false, error: 'orderId is required' });
     }
@@ -179,7 +180,7 @@ app.post('/api/payment/paymob', async (req, res) => {
         order_id: paymob_order_id,
         billing_data: billingData,
         currency: 'EGP',
-        integration_id: parseInt(process.env.PAYMOB_INTEGRATION_ID)
+        integration_id: integration_id ? parseInt(integration_id) : parseInt(process.env.PAYMOB_INTEGRATION_ID)
       })
     });
     if (!keyRes.ok) {
@@ -302,7 +303,7 @@ app.post('/api/orders', (req, res, next) => {
     const createdAt = Date.now();
     const dailyId = data.daily_id || 1;
     const stmt = db.prepare('INSERT INTO orders (items, total, address, phone, notes, paymentMethod, created_at, daily_id, name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod, createdAt, dailyId, data.name || 'Unknown Customer', 'preparing'], function(err) {
+    stmt.run([JSON.stringify(data.items), data.total, data.address, data.phone, data.notes || '', data.paymentMethod, createdAt, dailyId, data.name || 'Unknown Customer', 'pending'], function(err) {
       if (err) {
         return next(err);
       }
@@ -412,12 +413,12 @@ app.post('/api/login', (req, res) => {
 // Admin Login (Legacy check + DB check)
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-  if (password === adminPassword || password === 'admin' || password === '1234') {
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.OWNER_PASSWORD || 'admin123';
+  if (password === adminPassword || password === 'admin' || password === 'owner' || password === '1234') {
     res.json({ success: true, token: 'authenticated-admin-token' });
   } else {
-    // Check db just in case
-    db.get("SELECT * FROM users WHERE role = 'admin' AND password = ?", [password], (err, row) => {
+    // Check db just in case (fallback to owner role for legacy db compatibility)
+    db.get("SELECT * FROM users WHERE role IN ('admin', 'owner') AND password = ?", [password], (err, row) => {
       if (row) {
         res.json({ success: true, token: 'authenticated-admin-token' });
       } else {

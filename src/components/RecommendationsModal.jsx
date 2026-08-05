@@ -112,7 +112,6 @@ export default function RecommendationsModal({ onClose }) {
   const handleAddToCart = (updatedItem, quantity) => {
     addToCart(updatedItem, quantity);
     setSelectedItem(null);
-    showToast(language === 'ar' ? 'تم إضافة المنتج بنجاح 🛒' : 'Item added successfully 🛒');
   };
 
   return createPortal(

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2 } from 'lucide-react';
+import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2, MapPin } from 'lucide-react';
 import ProductModal from '../components/ProductModal';
 import RecommendationsModal from '../components/RecommendationsModal';
 
@@ -42,11 +42,74 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, countdown, title, messa
 };
 
 function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatus, clearCart, navigate, language, onClose: closeCart }) {
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmCountdown, setConfirmCountdown] = useState(5);
   const [isSubmittingState, setIsSubmittingState] = useState(false);
+  const [confirmedOrderData, setConfirmedOrderData] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState(null);
   const isSubmittingRef = React.useRef(false);
+
+  const handleGetLocation = () => {
+    setLocationError(null);
+
+    // Check if geolocation is available in this context (requires HTTPS or localhost)
+    const isSecureContext = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+    if (!navigator.geolocation || !isSecureContext) {
+      setLocationError(language === 'ar'
+        ? 'تحديد الموقع التلقائي يتطلب اتصالاً آمناً (HTTPS). يرجى كتابة عنوانك يدوياً في الخانة أدناه.'
+        : 'Auto-location requires a secure connection (HTTPS). Please type your address manually below.');
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ar`);
+          const data = await response.json();
+          if (data && data.display_name) {
+            setFormData(prev => ({
+              ...prev,
+              street: data.display_name
+            }));
+            setLocationError(null);
+          }
+        } catch (error) {
+          console.error('Error fetching location:', error);
+          setLocationError(language === 'ar'
+            ? 'تعذر تحويل موقعك لعنوان. يرجى كتابة العنوان يدوياً.'
+            : 'Could not convert location to address. Please type it manually.');
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        setIsLocating(false);
+        // POSITION_UNAVAILABLE (code 2) or PERMISSION_DENIED (code 1)
+        if (error.code === 1) {
+          setLocationError(language === 'ar'
+            ? 'تم رفض الوصول للموقع. يرجى كتابة عنوانك يدوياً في الخانة أدناه.'
+            : 'Location access denied. Please type your address manually below.');
+        } else {
+          setLocationError(language === 'ar'
+            ? 'تعذر تحديد موقعك. يرجى كتابة العنوان يدوياً.'
+            : 'Could not determine your location. Please type your address manually.');
+        }
+      }
+    );
+  };
+
+  const INTEGRATION_IDS = {
+    cards: 5811753,
+    wallets: "PLACEHOLDER_WALLETS",
+    instapay: "PLACEHOLDER_INSTAPAY"
+  };
 
   // Paymob In-Page States
   const [paymobIframeUrl, setPaymobIframeUrl] = useState(null);
@@ -69,7 +132,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
   // Fetch Iframe URL when Credit Card is selected
   useEffect(() => {
-    if (formData.paymentMethod === 'credit_card' && !paymobIframeUrl && !fetchingPaymob) {
+    if (formData.paymentMethod === 'cards' && !paymobIframeUrl && !fetchingPaymob) {
       setFetchingPaymob(true);
       const tempOrderId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       
@@ -87,7 +150,8 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           items: cart,
           name: formData.name,
           address: addressStr,
-          phone: formData.phone
+          phone: formData.phone,
+          integration_id: INTEGRATION_IDS.cards
         })
       })
       .then(res => res.json())
@@ -107,7 +171,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
       .finally(() => {
         setFetchingPaymob(false);
       });
-    } else if (formData.paymentMethod !== 'credit_card') {
+    } else if (formData.paymentMethod !== 'cards') {
       setPaymobIframeUrl(null);
     }
   }, [formData.paymentMethod]); // Only refetch if they toggle payment methods, to prevent constant iframe reloading on typing
@@ -156,7 +220,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (cart.length === 0) return;
+    if (!cart || cart.length === 0) return;
 
     if (!formData.name || !formData.phone || !formData.street) {
       setStatus({ type: 'error', message: t.fillFields });
@@ -189,19 +253,21 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     const dailyOrderId = globalCounter;
 
     try {
+      const payload = {
+        items: cart,
+        total: Number(cartTotal) || 0,
+        address: addressStr,
+        name: formData.name,
+        phone: formData.phone,
+        notes: formData.notes,
+        paymentMethod: formData.paymentMethod,
+        daily_id: dailyOrderId
+      };
+
       const response = await fetch(`${API}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: cart,
-          total: cartTotal,
-          address: addressStr,
-          name: formData.name,
-          phone: formData.phone,
-          notes: formData.notes,
-          paymentMethod: formData.paymentMethod,
-          daily_id: dailyOrderId
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -209,16 +275,22 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
       if (response.ok) {
         setStatus({ 
           type: 'success', 
-          message: language === 'ar' ? `تم تأكيد الطلب #${dailyOrderId} بنجاح!` : `Order #${dailyOrderId} placed securely!`,
+          message: language === 'ar' ? `تم تأكيد الطلب #${dailyOrderId} وجاري تحضيره الآن!` : `Order #${dailyOrderId} confirmed and is being prepared!`,
           orderId: dailyOrderId 
         });
+        setConfirmedOrderData({ ...payload, orderId: dailyOrderId, date: new Date().toLocaleString() });
         clearCart();
       } else {
-        setStatus({ type: 'error', message: data.error?.[0]?.message || (language === 'ar' ? 'فشل في إرسال الطلب.' : 'Failed to place order.') });
+        console.log('Order Submit Error:', data);
+        const errorMsg = data.error 
+          ? (Array.isArray(data.error) ? data.error[0].message : data.error) 
+          : (language === 'ar' ? 'فشل في إرسال الطلب.' : 'Failed to place order.');
+        setStatus({ type: 'error', message: errorMsg });
       }
     } catch (err) {
       console.error('Checkout failed', err);
-      setStatus({ type: 'error', message: t.networkError });
+      console.log('Order Submit Error:', err.response?.data || err.message || err);
+      setStatus({ type: 'error', message: err.message || t.networkError });
     } finally {
       isSubmittingRef.current = false;
       setIsSubmittingState(false);
@@ -298,8 +370,49 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
           {/* Street Address */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label htmlFor="street" style={labelStyle}>{t.street}</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="street" style={labelStyle}>{t.street}</label>
+              <button 
+                type="button" 
+                onClick={handleGetLocation} 
+                disabled={isLocating}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.4rem', 
+                  backgroundColor: 'transparent', 
+                  border: '1px solid var(--brand-red)', 
+                  color: 'var(--brand-red)', 
+                  padding: '0.4rem 0.8rem', 
+                  borderRadius: '20px', 
+                  fontSize: '0.85rem',
+                  cursor: isLocating ? 'not-allowed' : 'pointer',
+                  opacity: isLocating ? 0.7 : 1,
+                  transition: 'all 0.2s'
+                }}
+              >
+                <MapPin size={14} />
+                {isLocating ? (language === 'ar' ? 'جاري التحديد...' : 'Locating...') : (language === 'ar' ? 'تحديد موقعي الحالي' : 'Get Current Location')}
+              </button>
+            </div>
             <input type="text" id="street" name="street" value={formData.street || ''} onChange={handleChange} required placeholder={t.streetPH} style={inputStyle} />
+            {locationError && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.6rem 0.9rem', 
+                borderRadius: '8px', 
+                backgroundColor: 'rgba(255, 165, 0, 0.1)', 
+                border: '1px solid rgba(255, 165, 0, 0.4)', 
+                color: '#f5a623',
+                fontSize: '0.85rem',
+                lineHeight: 1.4
+              }}>
+                <span style={{ fontSize: '1rem', flexShrink: 0 }}>📍</span>
+                <span>{locationError}</span>
+              </div>
+            )}
           </div>
 
           {/* Building & Floor */}
@@ -328,29 +441,36 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           <CreditCard size={24} /> {language === 'ar' ? '٢.' : '2.'} {t.paymentTitle}
         </h3>
 
-        <div className="responsive-flex" style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'vodafone_cash' ? 'rgba(200, 16, 46, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
-            <input type="radio" name="paymentMethod" value="vodafone_cash" checked={formData.paymentMethod === 'vodafone_cash'} onChange={handleChange} style={{ display: 'none' }} />
-            <Smartphone size={32} color={formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--text-secondary)'} />
-            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'vodafone_cash' ? 'var(--brand-red)' : 'var(--text-secondary)', textAlign: 'center' }}>{t.vodafoneCash}</span>
-          </label>
-          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'cash' ? 'rgba(255, 215, 0, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+        <div className="responsive-flex" style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'cash' ? 'rgba(255, 215, 0, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
             <input type="radio" name="paymentMethod" value="cash" checked={formData.paymentMethod === 'cash'} onChange={handleChange} style={{ display: 'none' }} />
             <Banknote size={32} color={formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)'} />
-            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)', textAlign: 'center' }}>{t.anyCash}</span>
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'cash' ? 'var(--gold)' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'الدفع نقداً' : 'Cash on Delivery'}</span>
           </label>
-          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'credit_card' ? 'rgba(40, 167, 69, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
-            <input type="radio" name="paymentMethod" value="credit_card" checked={formData.paymentMethod === 'credit_card'} onChange={handleChange} style={{ display: 'none' }} />
-            <CreditCard size={32} color={formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--text-secondary)'} />
-            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'credit_card' ? '#28a745' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'الدفع ببطاقة بنكية' : 'Credit Card'}</span>
+
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'wallets' ? '#e60000' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'wallets' ? 'rgba(230, 0, 0, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+            <input type="radio" name="paymentMethod" value="wallets" checked={formData.paymentMethod === 'wallets'} onChange={handleChange} style={{ display: 'none' }} />
+            <Smartphone size={32} color={formData.paymentMethod === 'wallets' ? '#e60000' : 'var(--text-secondary)'} />
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'wallets' ? '#e60000' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'محافظ إلكترونية' : 'E-Wallets'}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Vodafone, Orange, Etisalat</span>
+          </label>
+
+          <label style={{ flex: 1, minWidth: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'instapay' ? '#662d91' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'instapay' ? 'rgba(102, 45, 145, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease' }}>
+            <input type="radio" name="paymentMethod" value="instapay" checked={formData.paymentMethod === 'instapay'} onChange={handleChange} style={{ display: 'none' }} />
+            <Smartphone size={32} color={formData.paymentMethod === 'instapay' ? '#662d91' : 'var(--text-secondary)'} />
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'instapay' ? '#662d91' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'إنستا باي' : 'InstaPay'}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Instant transfer</span>
           </label>
         </div>
 
-        {formData.paymentMethod === 'vodafone_cash' && (
-          <div className="fade-in" style={{ padding: '1.5rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px dashed var(--brand-red)', color: 'var(--text-secondary)', textAlign: 'center' }}>
-            {t.vodafoneNote}
-          </div>
-        )}
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '1.5rem', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${formData.paymentMethod === 'cards' ? '#28a745' : 'var(--border-color)'}`, backgroundColor: formData.paymentMethod === 'cards' ? 'rgba(40, 167, 69, 0.05)' : 'var(--bg-color)', transition: 'all 0.3s ease', width: '100%', boxSizing: 'border-box' }}>
+            <input type="radio" name="paymentMethod" value="cards" checked={formData.paymentMethod === 'cards'} onChange={handleChange} style={{ display: 'none' }} />
+            <CreditCard size={32} color={formData.paymentMethod === 'cards' ? '#28a745' : 'var(--text-secondary)'} />
+            <span style={{ fontWeight: 'bold', color: formData.paymentMethod === 'cards' ? '#28a745' : 'var(--text-secondary)', textAlign: 'center' }}>{language === 'ar' ? 'بطاقة بنكية' : 'Credit Card'}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>Al Ahly, Misr, QNB, CIB</span>
+          </label>
+        </div>
 
         {formData.paymentMethod === 'cash' && (
           <div className="fade-in" style={{ padding: '1.5rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px dashed var(--gold)', color: 'var(--text-secondary)', textAlign: 'center' }}>
@@ -358,28 +478,46 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           </div>
         )}
 
-        {formData.paymentMethod === 'credit_card' && (
-          <div className="fade-in" style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid #28a745', textAlign: 'center', width: '100%' }}>
+        {formData.paymentMethod === 'cards' && (
+          <div className="fade-in" style={{ marginTop: '1.5rem', padding: '0', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid #28a745', textAlign: 'center', width: '100%', overflow: 'hidden' }}>
             {fetchingPaymob ? (
-              <div style={{ color: 'var(--text-primary)' }}>{language === 'ar' ? 'جاري تجهيز بوابة الدفع...' : 'Preparing payment gateway...'}</div>
+              <div style={{ color: 'var(--text-primary)', padding: '2rem' }}>{language === 'ar' ? 'جاري تجهيز بوابة الدفع...' : 'Preparing payment gateway...'}</div>
             ) : paymobIframeUrl ? (
-              <div style={{ width: '100%', height: '650px', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ width: '100%', height: '750px', borderRadius: '8px', overflow: 'hidden', position: 'relative', zIndex: 50 }}>
                 <iframe 
                   src={paymobIframeUrl}
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
+                  style={{ width: '100%', height: '100%', border: 'none', overflow: 'hidden', position: 'relative', zIndex: 50 }}
+                  scrolling="no"
                   title="Paymob Payment Gateway"
                   allow="payment"
                 />
               </div>
             ) : (
-               <div style={{ color: 'var(--brand-red)' }}>{language === 'ar' ? 'تعذر جلب بوابة الدفع. يرجى التأكد من البيانات أو اختيار طريقة أخرى.' : 'Could not fetch payment gateway. Please check details or choose another method.'}</div>
+               <div style={{ color: 'var(--brand-red)', padding: '2rem' }}>{language === 'ar' ? 'تعذر جلب بوابة الدفع. يرجى التأكد من البيانات أو اختيار طريقة أخرى.' : 'Could not fetch payment gateway. Please check details or choose another method.'}</div>
             )}
           </div>
         )}
+
+        {(formData.paymentMethod === 'wallets' || formData.paymentMethod === 'instapay') && (
+          <div className="fade-in" style={{ marginTop: '1.5rem', padding: '2rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: `1px solid ${formData.paymentMethod === 'instapay' ? '#662d91' : '#e60000'}`, textAlign: 'center', width: '100%' }}>
+            <h4 style={{ marginBottom: '1rem', color: formData.paymentMethod === 'instapay' ? '#662d91' : '#e60000' }}>
+              {language === 'ar' ? 'بيانات الدفع' : 'Payment Details'}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px', margin: '0 auto' }}>
+              <input 
+                type="text" 
+                name="walletOrInstaPayNumber" 
+                onChange={handleChange} 
+                value={formData.walletOrInstaPayNumber || ''} 
+                placeholder={formData.paymentMethod === 'wallets' ? (language === 'ar' ? 'رقم المحفظة الإلكترونية' : 'E-Wallet Number') : (language === 'ar' ? 'عنوان الدفع (IPA)' : 'InstaPay Address (IPA)')} 
+                style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)', width: '100%', boxSizing: 'border-box' }} 
+                required
+              />
+            </div>
+          </div>
+        )}
       </div>
-      {status.type !== 'success' && formData.paymentMethod !== 'credit_card' && (
+      {status.type !== 'success' && formData.paymentMethod !== 'cards' && (
         <button type="submit" className="btn-primary" style={{ padding: '1.5rem', fontSize: '1.2rem', borderRadius: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '1rem' }} disabled={status.type === 'loading'}>
           {status.type === 'loading' ? t.processing : t.confirmBtn}
         </button>
@@ -438,6 +576,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
                   {t.trackOrder(status.orderId)}
                 </button>
               )}
+              {/* Print button removed as per restaurant owner request (receipt is internal) */}
               <button
                 type="button"
                 onClick={() => {
@@ -473,55 +612,79 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
         confirmText={language === 'ar' ? 'اضغط للتأكيد' : 'Click to Confirm'}
         cancelText={language === 'ar' ? 'إلغاء' : 'Cancel'}
       />
+
     </form>
   );
 }
 
-export default function Checkout({ isModal = false, onClose }) {
-  const { cart, cartTotal, clearCart, updateQuantity, updateCartItem, removeFromCart } = useCart();
+class CheckoutErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Cart Drawer/Checkout Crash:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', padding: '2rem', overflow: 'auto' }}>
+          <div style={{ color: '#ff4444', textAlign: 'left', maxWidth: '800px', width: '100%' }}>
+            <h2>Cart Component Crashed!</h2>
+            <p><strong>Error:</strong> {this.state.error?.toString()}</p>
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.8rem', marginTop: '1rem', background: '#222', padding: '1rem' }}>
+              {this.state.error?.stack}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function CheckoutInternal({ isModal = false, onClose }) {
+  const { cart, cartTotal, clearCart, updateQuantity, updateCartItem, removeFromCart, addToCart } = useCart();
   const navigate = useNavigate();
   const { language } = useLanguage();
 
   const [editingCartItem, setEditingCartItem] = useState(null);
+  const [addedSuggestions, setAddedSuggestions] = useState({});
   const [maxFreeSauces, setMaxFreeSauces] = useState(2);
   const [crossSellItems, setCrossSellItems] = useState([]);
   const [showCrossSell, setShowCrossSell] = useState(true);
   const [showRecModal, setShowRecModal] = useState(false);
 
-  useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/products`)
-      .then(res => res.json())
-      .then(data => {
-        const cartCategories = cart.map(item => item.category_key);
-        const cartKeys = cart.map(item => item.key);
-        
-        let targetCategories = new Set();
-        
-        if (cartCategories.includes('shawarma')) {
-          targetCategories.add('appetizers'); // Fatteh & sides
-          targetCategories.add('sauces');
-          targetCategories.add('shawarma'); // Boxes
-        }
-        if (cartCategories.includes('appetizers')) {
-          targetCategories.add('appetizers'); // Other fatteh/appetizers
-        }
-        if (cartCategories.includes('meals')) {
-          targetCategories.add('appetizers'); // Sides
-          targetCategories.add('meals'); // Grilled chicken
-        }
-        
-        // Fallback if empty cart or other categories
-        if (targetCategories.size === 0) {
-          targetCategories.add('appetizers');
-          targetCategories.add('drinks');
-          targetCategories.add('sauces');
-        }
+  const handleAddSuggestion = (item) => {
+    if (!cart || cart.length === 0) {
+      return;
+    }
+    
+    // Attach to the last cart item
+    const lastItem = cart[cart.length - 1];
+    if (!lastItem) return;
+    const priceToAdd = typeof item?.price === 'object' ? Math.min(...Object.values(item.price)) : item?.price;
+    const newAddOns = [...(lastItem.addOns || []), { ...item, price: priceToAdd }];
+    
+    updateCartItem(lastItem.cartItemId, { ...lastItem, addOns: newAddOns });
+    
+    setAddedSuggestions(prev => ({ ...prev, [item.id]: true }));
+    setTimeout(() => {
+      setAddedSuggestions(prev => ({ ...prev, [item.id]: false }));
+    }, 1500);
+  };
 
-        const filtered = data.filter(s => targetCategories.has(s.category_key) && !cartKeys.includes(s.key));
-        const shuffled = filtered.sort(() => 0.5 - Math.random());
-        setCrossSellItems(shuffled.slice(0, 3));
-      })
-      .catch(console.error);
+  useEffect(() => {
+    // Static standard Shawarma extras
+    const staticExtras = [
+      { id: 'extra-garlic', name_ar: 'تومية عادية', name_en: 'Garlic Dip', price: 10, img: 'Images/Products/sauces/garlic.png', is_addon: true },
+      { id: 'extra-cheddar-fries', name_ar: 'بطاطس شيدر', name_en: 'Cheddar Fries', price: 25, img: 'Images/Products/appetizers/fries.png', is_addon: true },
+      { id: 'extra-coleslaw', name_ar: 'سلطة كول سلو', name_en: 'Coleslaw', price: 15, img: 'Images/Products/sauces/coleslaw.png', is_addon: true }
+    ];
+    setCrossSellItems(staticExtras);
   }, [cart]);
 
   useEffect(() => {
@@ -588,7 +751,7 @@ export default function Checkout({ isModal = false, onClose }) {
     building: '',
     floor: '',
     notes: '',
-    paymentMethod: 'vodafone_cash'
+    paymentMethod: 'cash'
   });
   const [status, setStatus] = useState({ type: '', message: '' });
 
@@ -633,41 +796,57 @@ export default function Checkout({ isModal = false, onClose }) {
             {language === 'ar' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
           <div style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-            {cart.map((item, idx) => (
+            {(cart || []).map((item, idx) => {
+              if (!item) return null;
+              return (
               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '0.3rem' }}>{item.name}</h4>
+                  <h4 style={{ margin: 0, fontSize: '1.2rem', marginBottom: '0.3rem' }}>{item?.name || 'Unknown Item'}</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '0.5rem' }}>
-                    {item.selectedSpiciness && (
+                    {item?.selectedSpiciness && (
                       <span style={{ color: item.selectedSpiciness === 'حار' ? 'var(--brand-red)' : 'var(--text-secondary)', fontSize: '0.85rem' }}>
                         🌶️ {language === 'ar' ? `الطعم: ${item.selectedSpiciness}` : `Spiciness: ${item.selectedSpiciness}`}
                       </span>
                     )}
-                    {item.selectedSauces && item.selectedSauces.length > 0 && (
+                    {Array.isArray(item?.selectedSauces) && item.selectedSauces.length > 0 && (
                       <div style={{ color: 'var(--gold)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column' }}>
                         <span>🧄 {language === 'ar' ? `الصوصات: ${item.selectedSauces.join('، ')}` : `Sauces: ${item.selectedSauces.join(', ')}`}</span>
-                        {item.extraSaucePrice > 0 && (
+                        {(item?.extraSaucePrice || 0) > 0 && (
                           <span style={{ color: 'var(--brand-red)', marginTop: '0.2rem' }}>
                             {language === 'ar' ? `إضافات: صوص إضافي (+${item.extraSaucePrice} ج.م)` : `Additions: Extra Sauce (+${item.extraSaucePrice} EGP)`}
                           </span>
                         )}
                       </div>
                     )}
+                    {Array.isArray(item?.addOns) && item.addOns.length > 0 && (
+                      <div style={{ marginTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {item.addOns.map((addon, idx) => (
+                          <span key={idx} style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                            + {language === 'ar' ? addon?.name_ar : addon?.name_en} — {addon?.price || 0} {language === 'ar' ? 'ج.م' : 'EGP'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {item?.specialNote && (
+                      <span style={{ color: 'var(--brand-red)', fontSize: '0.85rem', fontStyle: 'italic', marginTop: '0.3rem' }}>
+                        📝 {language === 'ar' ? `ملاحظة: ${item.specialNote}` : `Note: ${item.specialNote}`}
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <button 
                         onClick={() => {
-                          if (item.quantity <= 1) {
-                            handleRemoveItem(item.cartItemId);
+                          if ((item?.quantity || 1) <= 1) {
+                            handleRemoveItem(item?.cartItemId);
                           } else {
-                            updateQuantity(item.cartItemId, item.quantity - 1);
+                            updateQuantity(item?.cartItemId, (item?.quantity || 1) - 1);
                           }
                         }}
                         style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                      <span style={{ fontSize: '1rem', fontWeight: 'bold' }}>{item.quantity}</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 'bold' }}>{item?.quantity || 1}</span>
                       <button 
-                        onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                        onClick={() => updateQuantity(item?.cartItemId, (item?.quantity || 1) + 1)}
                         style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                     </div>
                     <button 
@@ -676,7 +855,7 @@ export default function Checkout({ isModal = false, onClose }) {
                       <Edit2 size={14} /> {language === 'ar' ? 'تعديل' : 'Edit'}
                     </button>
                     <button 
-                      onClick={() => handleRemoveItem(item.cartItemId)}
+                      onClick={() => handleRemoveItem(item?.cartItemId)}
                       style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'color 0.2s' }}
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--brand-red)'}
                       onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
@@ -687,20 +866,22 @@ export default function Checkout({ isModal = false, onClose }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
                   {(() => {
-                    const basePriceVal = parseInt(item.price?.toString().match(/(\d+)/)?.[0] || 0);
-                    const extras = item.extraSaucePrice || 0;
-                    const total = (basePriceVal + extras) * item.quantity;
+                    const basePriceVal = parseInt(item?.price?.toString().match(/(\d+)/)?.[0] || 0);
+                    const extras = item?.extraSaucePrice || 0;
+                    const addOnsTotal = (Array.isArray(item?.addOns) ? item.addOns : []).reduce((sum, addOn) => sum + (Number(addOn?.price) || 0), 0);
+                    const qty = item?.quantity || 1;
+                    const total = (basePriceVal + extras + addOnsTotal) * qty;
                     
                     return (
                       <>
                         <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--gold)' }}>
                           {language === 'ar' ? `${total} ج.م` : `${total} EGP`}
                         </div>
-                        {(extras > 0 || item.quantity > 1) && (
+                        {(extras > 0 || addOnsTotal > 0 || qty > 1) && (
                           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem', direction: 'ltr' }}>
-                            {extras > 0 
-                              ? `(${basePriceVal} + ${extras}) × ${item.quantity}` 
-                              : `${basePriceVal} × ${item.quantity}`}
+                            {(extras > 0 || addOnsTotal > 0) 
+                              ? `(${basePriceVal} + ${extras + addOnsTotal}) × ${qty}` 
+                              : `${basePriceVal} × ${qty}`}
                           </div>
                         )}
                       </>
@@ -708,7 +889,7 @@ export default function Checkout({ isModal = false, onClose }) {
                   })()}
                 </div>
               </div>
-            ))}
+            )})}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', fontSize: '1.5rem', fontWeight: '900', paddingTop: '1rem', borderTop: '2px dashed var(--border-color)' }}>
               <span>{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span>
               <span style={{ color: 'var(--brand-red)' }}>{cartTotal} {language === 'ar' ? 'جنيه' : 'EGP'}</span>
@@ -721,7 +902,7 @@ export default function Checkout({ isModal = false, onClose }) {
           <div style={{ backgroundColor: 'var(--card-bg)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--gold)' }}>
-                {language === 'ar' ? '💡 قائمة المقترحات' : '💡 Suggested for you'}
+                {language === 'ar' ? '🍟 إضافات' : '🍟 Add-ons / Extras'}
               </h3>
               <button 
                 onClick={(e) => {
@@ -748,7 +929,7 @@ export default function Checkout({ isModal = false, onClose }) {
               >
                 {showCrossSell 
                   ? <><X size={20} /> {language === 'ar' ? 'إخفاء' : 'Hide'}</>
-                  : (language === 'ar' ? 'إظهار المقترحات' : 'Show Suggestions')}
+                  : (language === 'ar' ? 'إظهار الإضافات' : 'Show Add-ons')}
               </button>
             </div>
             <div 
@@ -772,12 +953,16 @@ export default function Checkout({ isModal = false, onClose }) {
                         </div>
                       </div>
                       <button 
-                        onClick={() => setEditingCartItem(item)}
-                        style={{ backgroundColor: 'var(--gold)', color: '#000', border: 'none', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d4a331'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--gold)'}
+                        onClick={() => handleAddSuggestion(item)}
+                        style={{ 
+                          backgroundColor: addedSuggestions[item.id] ? '#4CAF50' : 'var(--gold)', 
+                          color: addedSuggestions[item.id] ? '#fff' : '#000', 
+                          border: 'none', padding: '0.6rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' 
+                        }}
+                        onMouseEnter={e => !addedSuggestions[item.id] && (e.currentTarget.style.backgroundColor = '#d4a331')}
+                        onMouseLeave={e => !addedSuggestions[item.id] && (e.currentTarget.style.backgroundColor = 'var(--gold)')}
                       >
-                        {language === 'ar' ? '+ إضافة للسلة' : '+ Add to Cart'}
+                        {addedSuggestions[item.id] ? (language === 'ar' ? '✓ تم الإضافة' : '✓ Added') : (language === 'ar' ? '+ إضافة للسلة' : '+ Add to Cart')}
                       </button>
                     </div>
                   ))}
@@ -887,7 +1072,7 @@ export default function Checkout({ isModal = false, onClose }) {
           </div>
 
           <div style={{ flex: 1 }}>
-            {cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent}
+            {(cart?.length || 0) === 0 && status?.type !== 'success' ? <EmptyCartView /> : CheckoutContent}
           </div>
         </div>
         
@@ -910,6 +1095,7 @@ export default function Checkout({ isModal = false, onClose }) {
           </div>
         )}
 
+        {/* Receipt Template moved to CheckoutForm */}
         <style>{`
           @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
           @keyframes slideInRight {
@@ -933,5 +1119,13 @@ export default function Checkout({ isModal = false, onClose }) {
     );
   }
 
-  return cart.length === 0 && status.type !== 'success' ? <EmptyCartView /> : CheckoutContent;
+  return cart?.length === 0 && status?.type !== 'success' ? <EmptyCartView /> : CheckoutContent;
+}
+
+export default function Checkout(props) {
+  return (
+    <CheckoutErrorBoundary>
+      <CheckoutInternal {...props} />
+    </CheckoutErrorBoundary>
+  );
 }

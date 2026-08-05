@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import AboutUs from './pages/AboutUs';
@@ -12,16 +12,13 @@ import OurStory from './pages/OurStory';
 import Chef from './pages/Chef';
 import Events from './pages/Events';
 import Testimonials from './pages/Testimonials';
-import Management from './pages/Management';
+import ManagerDashboard from './pages/ManagerDashboard';
 import CheckoutPayment from './pages/CheckoutPayment';
 import PaymobCallback from './pages/PaymobCallback';
-
+import AdminDashboard from './pages/AdminDashboard';
+import OrderTracking from './pages/OrderTracking';
 import { CartProvider } from './context/CartContext';
 import { LanguageProvider } from './context/LanguageContext';
-import Admin from './pages/Admin';
-import OrderTracking from './pages/OrderTracking';
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 
 // Scrolls to top of page on every route change
 function ScrollToTop() {
@@ -53,6 +50,27 @@ function GlobalEventHandlers() {
   return null;
 }
 
+function NotFoundOrRedirect() {
+  const isManager = sessionStorage.getItem('manager_session') === 'true';
+  const isAdmin = sessionStorage.getItem('admin_session') === 'true';
+  const location = useLocation();
+
+  if (isManager && location.pathname !== '/manager-dashboard') {
+    return <Navigate to="/manager-dashboard" replace />;
+  }
+  if (isAdmin && location.pathname !== '/admin-dashboard') {
+    return <Navigate to="/admin-dashboard" replace />;
+  }
+
+  return (
+    <div style={{ padding: '12rem 2rem', textAlign: 'center', minHeight: '60vh' }}>
+      <h1 style={{ fontSize: '4rem', color: 'var(--brand-red)', marginBottom: '1rem' }}>404</h1>
+      <h2 style={{ fontSize: '2rem', color: 'var(--gold)', marginBottom: '1rem' }}>الصفحة غير موجودة</h2>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>نعتذر، المسار الذي تحاول الوصول إليه غير متاح أو تم نقله.</p>
+    </div>
+  );
+}
+
 function App() {
   return (
     <LanguageProvider>
@@ -73,18 +91,12 @@ function App() {
               <Route path="/chef" element={<Chef />} />
               <Route path="/events" element={<Events />} />
               <Route path="/testimonials" element={<Testimonials />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/management" element={<Management />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/manager-dashboard" element={<ManagerDashboard />} />
               <Route path="/checkout/payment" element={<CheckoutPayment />} />
               <Route path="/checkout/callback" element={<PaymobCallback />} />
               <Route path="/track" element={<OrderTracking />} />
-              <Route path="*" element={
-                <div style={{ padding: '12rem 2rem', textAlign: 'center', minHeight: '60vh' }}>
-                  <h1 style={{ fontSize: '4rem', color: 'var(--brand-red)', marginBottom: '1rem' }}>404</h1>
-                  <h2 style={{ fontSize: '2rem', color: 'var(--gold)', marginBottom: '1rem' }}>الصفحة غير موجودة</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>نعتذر، المسار الذي تحاول الوصول إليه غير متاح أو تم نقله.</p>
-                </div>
-              } />
+              <Route path="*" element={<NotFoundOrRedirect />} />
             </Routes>
           </Layout>
         </Router>

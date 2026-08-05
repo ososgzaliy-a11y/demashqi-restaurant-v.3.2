@@ -51,21 +51,21 @@ export default function AboutUs() {
               {[
                 {
                   en: { name: 'Main Branch', address: 'Al-Muhafaza St. - In front of Social Club' },
-                  ar: { name: 'الفرع الرئيسي', address: 'شارع المحافظة - امام النادي الاجتماعي' },
+                  ar: { name: 'الفرع الرئيسي', address: 'ش عبدالسلام الشاذلي - ش صيدلية مني المر بجوار موبيل امام النادي الاجتماع' },
                   phones: '045/3149997 - 01094956760',
-                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
+                  mapLink: 'https://maps.app.goo.gl/ptV517u1JXwDMBt99'
                 },
                 {
                   en: { name: 'Al-Rahibat Branch', address: 'Damanhour - Middle of Al-Rahibat St.' },
-                  ar: { name: 'فرع الراهبات', address: 'دمنهور - منتصف شارع الراهبات' },
+                  ar: { name: 'فرع الراهبات', address: ' منتصف شارع الراهبات' },
                   phones: '045/3220067 - 01060646298',
                   mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
                 },
                 {
                   en: { name: 'Damanhour University Branch', address: 'Colleges Complex - University Tower' },
-                  ar: { name: 'فرع جامعة دمنهور', address: 'مجمع الكليات - برج الجامعة' },
+                  ar: { name: 'فرع جامعة دمنهور', address: 'مجمع الكليات دمنهور - برج الجامعة' },
                   phones: '045/3149998',
-                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
+                  mapLink: 'https://maps.app.goo.gl/Lmst7wFoFKmZiHLB9'
                 }
               ].map((branch, i) => (
                 <div key={i} className={`fade-in stagger-${(i % 4) + 1}`} style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem 2rem', borderRadius: '12px', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, border-color 0.3s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>

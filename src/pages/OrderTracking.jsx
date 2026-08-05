@@ -9,7 +9,7 @@ export default function OrderTracking() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
   const isRTL = language === 'ar';
   const orderIdParam = searchParams.get('id') || '';
 

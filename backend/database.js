@@ -127,12 +127,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
           if (!err && row.count === 0) {
             const stmt = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)');
-            stmt.run(['admin', 'admin123', 'admin']);
+            stmt.run(['owner', 'owner123', 'owner']);
             stmt.run(['manager', 'manager123', 'manager']);
             stmt.run(['delivery', 'delivery123', 'delivery']);
             stmt.run(['client', 'client123', 'client']);
             stmt.finalize();
-            console.log('Seeded default users (admin, manager, delivery, client)');
+            console.log('Seeded default users (owner, manager, delivery, client)');
           }
         });
       });

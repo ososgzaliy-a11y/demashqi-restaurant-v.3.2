@@ -11,7 +11,7 @@ import ProductModal from '../components/ProductModal';
 const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
 
 export default function Menu() {
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
   const { addToCart, openCheckout } = useCart();
   const { t, language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState(null);
@@ -34,8 +34,27 @@ export default function Menu() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
+    
+    const handleReset = () => {
+      setSelectedItem(null);
+      setActiveCategoryKey('all');
+      setSearchQuery('');
+      setTimeout(() => {
+        const grid = document.getElementById('menu-grid');
+        if (grid) {
+          const yOffset = -80; // adjust for navbar height
+          const y = grid.getBoundingClientRect().top + window.scrollY + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 50);
+    };
+
     window.addEventListener('navigateToCategory', handleNavigate);
-    return () => window.removeEventListener('navigateToCategory', handleNavigate);
+    window.addEventListener('resetUIState', handleReset);
+    return () => {
+      window.removeEventListener('navigateToCategory', handleNavigate);
+      window.removeEventListener('resetUIState', handleReset);
+    };
   }, []);
 
   const location = useLocation();
@@ -151,7 +170,6 @@ export default function Menu() {
   const handleAddToCart = (updatedItem, quantity) => {
     addToCart(updatedItem, quantity);
     setSelectedItem(null);
-    openCheckout();
   };
 
   const getDisplayPrice = (rawPrice) => {
@@ -187,7 +205,7 @@ export default function Menu() {
         </div>
       </header>
 
-      <section className="section container">
+      <section id="menu-grid" className="section container">
         {/* Search Bar */}
         <div style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'center' }}>
           <input
@@ -338,6 +356,7 @@ export default function Menu() {
           categoriesData={categoriesData}
           maxFreeSauces={maxFreeSauces}
           onClose={() => setSelectedItem(null)}
+          onNavigateToProduct={(product) => setSelectedItem(product)}
           onSave={handleAddToCart}
           isEditMode={false}
         />

@@ -15,7 +15,7 @@ import OffersSlider from '../components/OffersSlider';
 
 export default function Home() {
   const { t, language } = useLanguage();
-  const API = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+  const API = import.meta.env.VITE_API_BASE_URL || '';
   const { addToCart } = useCart();
   const [offers, setOffers] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -185,6 +185,7 @@ export default function Home() {
         <ProductModal
           item={selectedProduct}
           onClose={() => setSelectedProduct(null)}
+          onNavigateToProduct={(product) => setSelectedProduct(product)}
           onSave={(cartItem, qty) => {
             addToCart(cartItem, qty);
             setSelectedProduct(null);
