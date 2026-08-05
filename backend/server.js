@@ -10,8 +10,14 @@ const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust Replit/Railway/Cloudflare proxy headers (required for rate limiting behind reverse proxies)
+app.set('trust proxy', 1);
+
 // Security and utility middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false
+}));
 app.use(cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -19,7 +25,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting: max 100 requests per 15 minutes per IP
+// Rate limiting: max 5000 requests per 15 minutes per IP
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 5000, 

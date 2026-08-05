@@ -10,6 +10,7 @@
     "dev": "vite --host",
     "backend": "node backend/server.js",
     "build": "vite build",
+    "start": "npm run build && node backend/server.js",
     "lint": "oxlint",
     "preview": "vite preview --host"
   },
