@@ -12,6 +12,16 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Global Error Handler
+app.onError((err, c) => {
+  console.error('Unhandled Exception:', err);
+  return c.json({
+    success: false,
+    error: 'Internal Server Error',
+    message: err.message
+  }, 500);
+});
+
 // Schemas
 const reservationSchema = z.object({
   name: z.string().min(2).max(100),
@@ -69,6 +79,14 @@ const dbGet = (query, params = []) => new Promise((resolve, reject) => {
 });
 
 // --- API Routes ---
+
+app.get('/', (c) => {
+  return c.json({
+    status: 'success',
+    message: 'Demashqi Restaurant Backend is Active and Running on Cloudflare 🚀',
+    timestamp: new Date()
+  });
+});
 
 app.get('/api/test', (c) => c.json({ hello: 'world', time: Date.now() }));
 
