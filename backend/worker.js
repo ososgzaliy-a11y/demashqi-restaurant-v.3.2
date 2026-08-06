@@ -23,8 +23,8 @@ export default {
     if (!url.pathname.startsWith('/api') && env.ASSETS) {
       let assetRes = await env.ASSETS.fetch(request);
       if (assetRes.status === 404 && !url.pathname.includes('.')) {
-        // SPA Fallback
-        const indexReq = new Request(new URL('/index.html', url.origin), request);
+        // SPA Fallback: Fetch '/' from assets to get index.html without triggering Cloudflare's /index.html -> / redirect
+        const indexReq = new Request(new URL('/', url.origin), request);
         const indexRes = await env.ASSETS.fetch(indexReq);
         if (indexRes.status !== 404) {
           return indexRes;

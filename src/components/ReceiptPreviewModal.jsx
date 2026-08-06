@@ -82,22 +82,63 @@ export const ReceiptTemplate = ({ order, isPreview = false }) => {
 
 const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled, setAutoPrintEnabled, language }) => {
   const downloadReceiptPDF = () => {
-    const element = document.getElementById('printable-receipt-container');
-    if (!element) return;
-    
-    const opt = {
-      margin:       0,
-      filename:     `Order_${order?.orderId || order?.id || 'receipt'}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF:        { unit: 'mm', format: [80, 200], orientation: 'portrait' }
-    };
+    const container = document.createElement('div');
+    container.id = 'temp-print-container';
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '80mm';
+    container.style.backgroundColor = '#ffffff';
+    container.style.color = '#000000';
+    container.style.padding = '10mm';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.direction = 'rtl';
 
-    html2pdf().set(opt).from(element).save().then(() => {
-      if (autoPrintEnabled) {
-        onClose();
-      }
-    });
+    let itemsList = [];
+    try {
+      itemsList = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+    } catch(e) {}
+    if (!Array.isArray(itemsList)) itemsList = [];
+
+    container.innerHTML = `
+      <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #000;">مطعم الدمشقي</div>
+      <div style="text-align: center; color: #000; font-size: 12px; margin-bottom: 10px;">رقم الطلب: #${order?.orderId || order?.id || '1'}</div>
+      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+      <div style="color: #000; font-size: 12px; text-align: right;">الاسم: ${order?.name || order?.customerName || order?.customer || 'عميل'}</div>
+      <div style="color: #000; font-size: 12px; text-align: right;">تليفون: ${order?.phone || '-'}</div>
+      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+      <table style="width: 100%; border-collapse: collapse; color: #000; font-size: 12px;">
+        ${itemsList.map(item => `
+          <tr>
+            <td style="text-align: right; padding: 4px 0;"><b>${item.quantity || item.qty || 1}x</b> ${item.name}</td>
+            <td style="text-align: left; padding: 4px 0;">${(item.price || 0) * (item.quantity || item.qty || 1)} ج.م</td>
+          </tr>
+        `).join('')}
+      </table>
+      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+      <div style="text-align: center; font-weight: bold; font-size: 14px; color: #000;">
+        الإجمالي: ${order?.total || order?.totalPrice || 0} ج.م
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    setTimeout(() => {
+      const opt = {
+        margin: 0,
+        filename: `Order_${order?.orderId || order?.id || 'receipt'}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+        jsPDF: { unit: 'mm', format: [80, 200], orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(container).save().then(() => {
+        document.body.removeChild(container);
+        if (autoPrintEnabled) {
+          onClose();
+        }
+      });
+    }, 500);
   };
 
   useEffect(() => {
