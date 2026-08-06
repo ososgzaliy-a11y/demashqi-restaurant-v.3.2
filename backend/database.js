@@ -30,7 +30,7 @@ const db = {
     if (typeof params === 'function') { callback = params; params = []; }
     if (dbInstance) {
       dbInstance.prepare(sql).bind(...(params || [])).all().then(res => {
-        if (callback) callback(null, res.results);
+        if (callback) callback(null, res.results || []);
       }).catch(err => { if (callback) callback(err, []); });
     } else if (localDb) {
       localDb.all(sql, params, callback);

@@ -28,6 +28,18 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
+// Patch res.json to use res.end directly for Cloudflare
+app.use((req, res, next) => {
+  if (globalThis.IS_CLOUDFLARE) {
+    res.json = function(obj) {
+      if (!this.getHeader('Content-Type')) {
+        this.setHeader('Content-Type', 'application/json; charset=utf-8');
+      }
+      this.end(JSON.stringify(obj));
+    };
+  }
+  next();
+});
 // Rate limiting: max 5000 requests per 15 minutes per IP
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -327,6 +339,10 @@ app.post('/api/orders', (req, res, next) => {
   }
 });
 
+app.get('/api/test', (req, res) => {
+  res.json({ hello: 'world', time: Date.now() });
+});
+
 // --- Categories Endpoints ---
 app.get('/api/categories', (req, res, next) => {
   db.all('SELECT * FROM categories', [], (err, rows) => {
@@ -568,26 +584,23 @@ app.use((err, req, res, next) => {
 });
 
 // Serve Frontend Static Files (if dist exists)
-const distPath = typeof __dirname !== 'undefined' ? path.join(__dirname, '../dist') : '';
 try {
-  if (distPath && fs.existsSync(distPath)) {
-    console.log('Serving frontend from:', distPath);
-    app.use(express.static(distPath));
-    // Fallback to React Router for all non-API routes
-    app.use((req, res, next) => {
-      if (req.path.startsWith('/api')) return next();
-      const indexFile = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexFile)) {
-        res.sendFile(indexFile);
-      } else {
-        res.status(200).send('<h2>Building... Please refresh in a few seconds.</h2>');
-      }
-    });
+  if (globalThis.IS_CLOUDFLARE) {
+    app.get('/', (req, res) => res.json({ status: 'ok', message: 'API running on Cloudflare.' }));
   } else {
-    console.warn('WARNING: dist/ folder not found. Only API routes are available.');
-    app.get('/', (req, res) => {
-      res.json({ status: 'ok', message: 'Demashqi Restaurant API is running. Frontend not built yet.' });
-    });
+    const distPath = path.join(__dirname, '..', 'dist');
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.use((req, res, next) => {
+        if (req.path.startsWith('/api')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.warn('WARNING: dist/ folder not found. Only API routes are available.');
+      app.get('/', (req, res) => {
+        res.json({ status: 'ok', message: 'Demashqi Restaurant API is running. Frontend not built yet.' });
+      });
+    }
   }
 } catch (e) {
   app.get('/', (req, res) => res.json({ status: 'ok', message: 'API running.' }));

@@ -10,3 +10,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB" # Available in your worker as env.DB
 database_name = "demashqi-db"
 database_id = "a4fe78eb-6ac4-434c-8c59-9831f687ced1"
+
+[assets]
+binding = "ASSETS"
+directory = "dist"
