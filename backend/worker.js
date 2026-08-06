@@ -25,9 +25,13 @@ export default {
       if (assetRes.status === 404 && !url.pathname.includes('.')) {
         // SPA Fallback
         const indexReq = new Request(new URL('/index.html', url.origin), request);
-        return env.ASSETS.fetch(indexReq);
+        const indexRes = await env.ASSETS.fetch(indexReq);
+        if (indexRes.status !== 404) {
+          return indexRes;
+        }
+      } else if (assetRes.status !== 404) {
+        return assetRes;
       }
-      return assetRes;
     }
 
     try {

@@ -88,6 +88,14 @@ app.get('/', (c) => {
   });
 });
 
+app.get('/api/health', (c) => {
+  return c.json({
+    status: 'success',
+    message: 'Demashqi Restaurant Backend is Active and Running on Cloudflare 🚀',
+    timestamp: new Date()
+  });
+});
+
 app.get('/api/test', (c) => c.json({ hello: 'world', time: Date.now() }));
 
 app.get('/api/categories', async (c) => {

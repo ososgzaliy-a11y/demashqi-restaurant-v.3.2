@@ -75,7 +75,7 @@ function App() {
   return (
     <LanguageProvider>
       <CartProvider>
-        <Router basename={import.meta.env.DEV ? "/" : "/demashqi-restaurant-v.3.2"}>
+        <Router basename="/">
           <ScrollToTop />
           <GlobalEventHandlers />
           <Layout>
