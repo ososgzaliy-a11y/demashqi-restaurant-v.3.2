@@ -82,63 +82,48 @@ export const ReceiptTemplate = ({ order, isPreview = false }) => {
 
 const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled, setAutoPrintEnabled, language }) => {
   const downloadReceiptPDF = () => {
-    const container = document.createElement('div');
-    container.id = 'temp-print-container';
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '80mm';
-    container.style.backgroundColor = '#ffffff';
-    container.style.color = '#000000';
-    container.style.padding = '10mm';
-    container.style.fontFamily = 'Arial, sans-serif';
-    container.style.direction = 'rtl';
-
     let itemsList = [];
     try {
       itemsList = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
     } catch(e) {}
     if (!Array.isArray(itemsList)) itemsList = [];
 
-    container.innerHTML = `
-      <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #000;">مطعم الدمشقي</div>
-      <div style="text-align: center; color: #000; font-size: 12px; margin-bottom: 10px;">رقم الطلب: #${order?.orderId || order?.id || '1'}</div>
-      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
-      <div style="color: #000; font-size: 12px; text-align: right;">الاسم: ${order?.name || order?.customerName || order?.customer || 'عميل'}</div>
-      <div style="color: #000; font-size: 12px; text-align: right;">تليفون: ${order?.phone || '-'}</div>
-      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
-      <table style="width: 100%; border-collapse: collapse; color: #000; font-size: 12px;">
-        ${itemsList.map(item => `
-          <tr>
-            <td style="text-align: right; padding: 4px 0;"><b>${item.quantity || item.qty || 1}x</b> ${item.name}</td>
-            <td style="text-align: left; padding: 4px 0;">${(item.price || 0) * (item.quantity || item.qty || 1)} ج.م</td>
-          </tr>
-        `).join('')}
-      </table>
-      <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
-      <div style="text-align: center; font-weight: bold; font-size: 14px; color: #000;">
-        الإجمالي: ${order?.total || order?.totalPrice || 0} ج.م
+    const receiptHTML = `
+      <div style="width: 80mm; background-color: #ffffff; color: #000000; padding: 10mm; font-family: Arial, sans-serif; direction: rtl;">
+        <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #000;">مطعم الدمشقي</div>
+        <div style="text-align: center; color: #000; font-size: 12px; margin-bottom: 10px;">رقم الطلب: #${order?.orderId || order?.id || '1'}</div>
+        <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+        <div style="color: #000; font-size: 12px; text-align: right;">الاسم: ${order?.name || order?.customerName || order?.customer || 'عميل'}</div>
+        <div style="color: #000; font-size: 12px; text-align: right;">تليفون: ${order?.phone || '-'}</div>
+        <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+        <table style="width: 100%; border-collapse: collapse; color: #000; font-size: 12px;">
+          ${itemsList.map(item => `
+            <tr>
+              <td style="text-align: right; padding: 4px 0;"><b>${item.quantity || item.qty || 1}x</b> ${item.name}</td>
+              <td style="text-align: left; padding: 4px 0;">${(item.price || 0) * (item.quantity || item.qty || 1)} ج.م</td>
+            </tr>
+          `).join('')}
+        </table>
+        <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+        <div style="text-align: center; font-weight: bold; font-size: 14px; color: #000;">
+          الإجمالي: ${order?.total || order?.totalPrice || 0} ج.م
+        </div>
       </div>
     `;
 
-    document.body.appendChild(container);
+    const opt = {
+      margin: 0,
+      filename: `Order_${order?.orderId || order?.id || 'receipt'}.pdf`,
+      image: { type: 'jpeg', quality: 1 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+      jsPDF: { unit: 'mm', format: [80, 200], orientation: 'portrait' }
+    };
 
-    setTimeout(() => {
-      const opt = {
-        margin: 0,
-        filename: `Order_${order?.orderId || order?.id || 'receipt'}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
-        jsPDF: { unit: 'mm', format: [80, 200], orientation: 'portrait' }
-      };
-
-      html2pdf().set(opt).from(container).save().then(() => {
-        document.body.removeChild(container);
-        if (autoPrintEnabled) {
-          onClose();
-        }
-      });
-    }, 500);
+    html2pdf().set(opt).from(receiptHTML).save().then(() => {
+      if (autoPrintEnabled) {
+        onClose();
+      }
+    });
   };
 
   useEffect(() => {
@@ -169,8 +154,8 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
         .print-only { display: none; }
         @media print {
           body * { visibility: hidden !important; }
-          #print-area, #print-area * { visibility: visible !important; }
-          #print-area {
+          #printable-receipt-container, #printable-receipt-container * { visibility: visible !important; }
+          #printable-receipt-container {
             position: absolute;
             left: 0;
             top: 0;
@@ -184,14 +169,10 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
             margin: 0;
             size: 80mm auto;
           }
-          #printable-receipt-container * {
-            color: #000000 !important;
-            background-color: #ffffff !important;
-          }
         }
       `}</style>
 
-      {/* Dedicated Off-Screen Render Target for PDF Generation */}
+      {/* Dedicated Off-Screen Render Target for Native Printing */}
       <div 
         id="printable-receipt-container" 
         style={{ 
@@ -234,7 +215,7 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
           </div>
         )}
         
-        <div style={{ backgroundColor: '#fff', padding: '1rem', borderRadius: '8px', overflowY: 'auto', flex: 1, marginBottom: '1.5rem', color: '#000' }}>
+        <div id="receipt-preview-box" style={{ backgroundColor: '#fff', padding: '1rem', borderRadius: '8px', overflowY: 'auto', flex: 1, marginBottom: '1.5rem', color: '#000' }}>
           <ReceiptTemplate order={order} isPreview={true} />
         </div>
 
@@ -251,7 +232,10 @@ const ReceiptPreviewModal = ({ isOpen, onClose, order, onPrint, autoPrintEnabled
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button onClick={downloadReceiptPDF} className="btn-primary" style={{ flex: 1, padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
               <Navigation size={20} />
-              {language === 'ar' ? 'طباعة / حفظ PDF' : 'Print / Save PDF'}
+              {language === 'ar' ? 'حفظ PDF' : 'Save PDF'}
+            </button>
+            <button onClick={() => { window.print(); onClose(); }} style={{ flex: 1, padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', backgroundColor: '#3B82F6', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+              {language === 'ar' ? 'طباعة مباشرة' : 'Direct Print'}
             </button>
             <button onClick={onClose} style={{ padding: '1rem', borderRadius: '8px', fontSize: '1.1rem', backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer' }}>
               {language === 'ar' ? 'إغلاق' : 'Close'}
