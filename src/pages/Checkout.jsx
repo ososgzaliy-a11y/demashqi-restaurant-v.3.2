@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2, MapPin } from 'lucide-react';
+import { CreditCard, ShoppingBag, Smartphone, CheckCircle, Navigation, Banknote, AlertTriangle, X, Edit2, Trash2 } from 'lucide-react';
 import ProductModal from '../components/ProductModal';
 import RecommendationsModal from '../components/RecommendationsModal';
 
@@ -47,63 +47,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
   const [confirmCountdown, setConfirmCountdown] = useState(5);
   const [isSubmittingState, setIsSubmittingState] = useState(false);
   const [confirmedOrderData, setConfirmedOrderData] = useState(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationError, setLocationError] = useState(null);
   const isSubmittingRef = React.useRef(false);
-
-  const handleGetLocation = () => {
-    setLocationError(null);
-
-    // Check if geolocation is available in this context (requires HTTPS or localhost)
-    const isSecureContext = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-
-    if (!navigator.geolocation || !isSecureContext) {
-      setLocationError(language === 'ar'
-        ? 'تحديد الموقع التلقائي يتطلب اتصالاً آمناً (HTTPS). يرجى كتابة عنوانك يدوياً في الخانة أدناه.'
-        : 'Auto-location requires a secure connection (HTTPS). Please type your address manually below.');
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ar`);
-          const data = await response.json();
-          if (data && data.display_name) {
-            setFormData(prev => ({
-              ...prev,
-              street: data.display_name
-            }));
-            setLocationError(null);
-          }
-        } catch (error) {
-          console.error('Error fetching location:', error);
-          setLocationError(language === 'ar'
-            ? 'تعذر تحويل موقعك لعنوان. يرجى كتابة العنوان يدوياً.'
-            : 'Could not convert location to address. Please type it manually.');
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        setIsLocating(false);
-        // POSITION_UNAVAILABLE (code 2) or PERMISSION_DENIED (code 1)
-        if (error.code === 1) {
-          setLocationError(language === 'ar'
-            ? 'تم رفض الوصول للموقع. يرجى كتابة عنوانك يدوياً في الخانة أدناه.'
-            : 'Location access denied. Please type your address manually below.');
-        } else {
-          setLocationError(language === 'ar'
-            ? 'تعذر تحديد موقعك. يرجى كتابة العنوان يدوياً.'
-            : 'Could not determine your location. Please type your address manually.');
-        }
-      }
-    );
-  };
 
   const INTEGRATION_IDS = {
     cards: 5811753,
@@ -370,49 +314,8 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
           {/* Street Address */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label htmlFor="street" style={labelStyle}>{t.street}</label>
-              <button 
-                type="button" 
-                onClick={handleGetLocation} 
-                disabled={isLocating}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.4rem', 
-                  backgroundColor: 'transparent', 
-                  border: '1px solid var(--brand-red)', 
-                  color: 'var(--brand-red)', 
-                  padding: '0.4rem 0.8rem', 
-                  borderRadius: '20px', 
-                  fontSize: '0.85rem',
-                  cursor: isLocating ? 'not-allowed' : 'pointer',
-                  opacity: isLocating ? 0.7 : 1,
-                  transition: 'all 0.2s'
-                }}
-              >
-                <MapPin size={14} />
-                {isLocating ? (language === 'ar' ? 'جاري التحديد...' : 'Locating...') : (language === 'ar' ? 'تحديد موقعي الحالي' : 'Get Current Location')}
-              </button>
-            </div>
+            <label htmlFor="street" style={labelStyle}>{t.street}</label>
             <input type="text" id="street" name="street" value={formData.street || ''} onChange={handleChange} required placeholder={t.streetPH} style={inputStyle} />
-            {locationError && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                padding: '0.6rem 0.9rem', 
-                borderRadius: '8px', 
-                backgroundColor: 'rgba(255, 165, 0, 0.1)', 
-                border: '1px solid rgba(255, 165, 0, 0.4)', 
-                color: '#f5a623',
-                fontSize: '0.85rem',
-                lineHeight: 1.4
-              }}>
-                <span style={{ fontSize: '1rem', flexShrink: 0 }}>📍</span>
-                <span>{locationError}</span>
-              </div>
-            )}
           </div>
 
           {/* Building & Floor */}
