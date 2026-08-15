@@ -55,70 +55,54 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
     instapay: "PLACEHOLDER_INSTAPAY"
   };
 
-  // Paymob In-Page States
-  const [paymobIframeUrl, setPaymobIframeUrl] = useState(null);
-  const [fetchingPaymob, setFetchingPaymob] = useState(false);
-  
-  // Listen for Paymob Iframe Callback Message
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data?.type === 'PAYMOB_RESULT') {
-        if (event.data.success) {
-          createOrderInDB(true);
-        } else {
-          setStatus({ type: 'error', message: language === 'ar' ? 'فشلت عملية الدفع. يرجى مراجعة بيانات البطاقة والمحاولة مرة أخرى.' : 'Payment failed. Please review your card details and try again.' });
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [cart, formData, cartTotal, language]);
+  const initiatePaymobRedirect = async () => {
+    setStatus({ type: 'loading', message: language === 'ar' ? 'جاري التحويل لبوابة الدفع الآمنة...' : 'Redirecting to secure payment gateway...' });
+    
+    let addressParts = [formData.street];
+    if (formData.building) addressParts.push(`${language === 'ar' ? 'مبنى' : 'Building'} ${formData.building}`);
+    if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
+    const addressStr = addressParts.join(', ');
 
-  // Fetch Iframe URL when Credit Card is selected
-  useEffect(() => {
-    if (formData.paymentMethod === 'cards' && !paymobIframeUrl && !fetchingPaymob) {
-      setFetchingPaymob(true);
-      const tempOrderId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      
-      let addressParts = [formData.street];
-      if (formData.building) addressParts.push(`${language === 'ar' ? 'مبنى' : 'Building'} ${formData.building}`);
-      if (formData.floor) addressParts.push(`${language === 'ar' ? 'طابق' : 'Floor'} ${formData.floor}`);
-      const addressStr = addressParts.join(', ');
+    let globalCounter = parseInt(localStorage.getItem('globalOrderCounter') || '7023', 10);
+    globalCounter += 1;
+    localStorage.setItem('globalOrderCounter', globalCounter.toString());
+    const tempOrderId = `temp_${Date.now()}_${globalCounter}`;
 
-      fetch(`${API}/api/payment/paymob`, {
+    try {
+      const payload = {
+        orderId: tempOrderId,
+        total: cartTotal,
+        items: cart,
+        name: formData.name,
+        address: addressStr,
+        phone: formData.phone,
+        paymentMethod: formData.paymentMethod,
+        walletNumber: formData.walletOrInstaPayNumber
+      };
+
+      sessionStorage.setItem('pendingOrder', JSON.stringify({
+        ...payload,
+        daily_id: globalCounter,
+        notes: formData.notes
+      }));
+
+      const response = await fetch(`${API}/api/payment/paymob`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: tempOrderId,
-          total: cartTotal,
-          items: cart,
-          name: formData.name,
-          address: addressStr,
-          phone: formData.phone,
-          integration_id: INTEGRATION_IDS.cards
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.paymentKey) {
-          setPaymobIframeUrl(`https://accept.paymob.com/api/acceptance/iframes/1064976?payment_token=${data.paymentKey}`);
-        } else if (data.success && data.iframeUrl) {
-          setPaymobIframeUrl(data.iframeUrl);
-        } else {
-          setStatus({ type: 'error', message: language === 'ar' ? 'حدث خطأ في تجهيز الدفع' : 'Error preparing payment' });
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        setStatus({ type: 'error', message: language === 'ar' ? 'خطأ في الاتصال بخادم الدفع' : 'Payment server error' });
-      })
-      .finally(() => {
-        setFetchingPaymob(false);
+        body: JSON.stringify(payload)
       });
-    } else if (formData.paymentMethod !== 'cards') {
-      setPaymobIframeUrl(null);
+      const data = await response.json();
+      
+      if (data.success && data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      } else {
+        setStatus({ type: 'error', message: language === 'ar' ? 'حدث خطأ في تجهيز الدفع' : 'Error preparing payment' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: 'error', message: language === 'ar' ? 'خطأ في الاتصال بخادم الدفع' : 'Payment server error' });
     }
-  }, [formData.paymentMethod]); // Only refetch if they toggle payment methods, to prevent constant iframe reloading on typing
+  };
 
 
   const closeSuccessModal = () => {
@@ -243,7 +227,11 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
 
   const proceedCheckout = () => {
     setShowConfirmModal(false);
-    createOrderInDB(false);
+    if (formData.paymentMethod === 'cards' || formData.paymentMethod === 'wallets') {
+      initiatePaymobRedirect();
+    } else {
+      createOrderInDB(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -381,25 +369,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           </div>
         )}
 
-        {formData.paymentMethod === 'cards' && (
-          <div className="fade-in" style={{ marginTop: '1.5rem', padding: '0', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: '1px solid #28a745', textAlign: 'center', width: '100%', overflow: 'hidden' }}>
-            {fetchingPaymob ? (
-              <div style={{ color: 'var(--text-primary)', padding: '2rem' }}>{language === 'ar' ? 'جاري تجهيز بوابة الدفع...' : 'Preparing payment gateway...'}</div>
-            ) : paymobIframeUrl ? (
-              <div style={{ width: '100%', height: '750px', borderRadius: '8px', overflow: 'hidden', position: 'relative', zIndex: 50 }}>
-                <iframe 
-                  src={paymobIframeUrl}
-                  style={{ width: '100%', height: '100%', border: 'none', overflow: 'hidden', position: 'relative', zIndex: 50 }}
-                  scrolling="no"
-                  title="Paymob Payment Gateway"
-                  allow="payment"
-                />
-              </div>
-            ) : (
-               <div style={{ color: 'var(--brand-red)', padding: '2rem' }}>{language === 'ar' ? 'تعذر جلب بوابة الدفع. يرجى التأكد من البيانات أو اختيار طريقة أخرى.' : 'Could not fetch payment gateway. Please check details or choose another method.'}</div>
-            )}
-          </div>
-        )}
+
 
         {(formData.paymentMethod === 'wallets' || formData.paymentMethod === 'instapay') && (
           <div className="fade-in" style={{ marginTop: '1.5rem', padding: '2rem', backgroundColor: 'var(--bg-color)', borderRadius: '8px', border: `1px solid ${formData.paymentMethod === 'instapay' ? '#662d91' : '#e60000'}`, textAlign: 'center', width: '100%' }}>
@@ -420,7 +390,7 @@ function CheckoutForm({ formData, setFormData, cart, cartTotal, status, setStatu
           </div>
         )}
       </div>
-      {status.type !== 'success' && formData.paymentMethod !== 'cards' && (
+      {status.type !== 'success' && (
         <button type="submit" className="btn-primary" style={{ padding: '1.5rem', fontSize: '1.2rem', borderRadius: '50px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.8rem', marginTop: '1rem' }} disabled={status.type === 'loading'}>
           {status.type === 'loading' ? t.processing : t.confirmBtn}
         </button>
@@ -562,17 +532,10 @@ function CheckoutInternal({ isModal = false, onClose }) {
   const [showRecModal, setShowRecModal] = useState(false);
 
   const handleAddSuggestion = (item) => {
-    if (!cart || cart.length === 0) {
-      return;
-    }
-    
-    // Attach to the last cart item
-    const lastItem = cart[cart.length - 1];
-    if (!lastItem) return;
     const priceToAdd = typeof item?.price === 'object' ? Math.min(...Object.values(item.price)) : item?.price;
-    const newAddOns = [...(lastItem.addOns || []), { ...item, price: priceToAdd }];
+    const nameToAdd = language === 'ar' ? (item.name_ar || item.name) : (item.name_en || item.name);
     
-    updateCartItem(lastItem.cartItemId, { ...lastItem, addOns: newAddOns });
+    addToCart({ ...item, name: nameToAdd, price: priceToAdd, is_addon: true }, 1);
     
     setAddedSuggestions(prev => ({ ...prev, [item.id]: true }));
     setTimeout(() => {
@@ -722,11 +685,53 @@ function CheckoutInternal({ isModal = false, onClose }) {
                       </div>
                     )}
                     {Array.isArray(item?.addOns) && item.addOns.length > 0 && (
-                      <div style={{ marginTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        {item.addOns.map((addon, idx) => (
-                          <span key={idx} style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            + {language === 'ar' ? addon?.name_ar : addon?.name_en} — {addon?.price || 0} {language === 'ar' ? 'ج.م' : 'EGP'}
-                          </span>
+                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {Object.values(item.addOns.reduce((acc, addon) => {
+                          const key = addon.id || addon.name_en || addon.name_ar || 'unknown';
+                          if (!acc[key]) {
+                            acc[key] = { ...addon, count: 1 };
+                          } else {
+                            acc[key].count += 1;
+                          }
+                          return acc;
+                        }, {})).map((addonGroup, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.6rem', borderRadius: '6px' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              + {language === 'ar' ? addonGroup?.name_ar : addonGroup?.name_en} — {addonGroup?.price || 0} {language === 'ar' ? 'ج.م' : 'EGP'}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const newAddOns = [...item.addOns];
+                                  const idxToRemove = newAddOns.findIndex(a => (a.id || a.name_en || a.name_ar) === (addonGroup.id || addonGroup.name_en || addonGroup.name_ar));
+                                  if (idxToRemove > -1) newAddOns.splice(idxToRemove, 1);
+                                  updateCartItem(item.cartItemId, { ...item, addOns: newAddOns });
+                                }}
+                                style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
+                              >-</button>
+                              <span style={{ fontSize: '0.85rem', minWidth: '12px', textAlign: 'center' }}>{addonGroup.count}</span>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const addonToAdd = item.addOns.find(a => (a.id || a.name_en || a.name_ar) === (addonGroup.id || addonGroup.name_en || addonGroup.name_ar));
+                                  const newAddOns = [...item.addOns, { ...addonToAdd }];
+                                  updateCartItem(item.cartItemId, { ...item, addOns: newAddOns });
+                                }}
+                                style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--bg-color)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
+                              >+</button>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const newAddOns = item.addOns.filter(a => (a.id || a.name_en || a.name_ar) !== (addonGroup.id || addonGroup.name_en || addonGroup.name_ar));
+                                  updateCartItem(item.cartItemId, { ...item, addOns: newAddOns });
+                                }}
+                                style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'transparent', border: 'none', color: 'var(--brand-red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '0.2rem' }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}

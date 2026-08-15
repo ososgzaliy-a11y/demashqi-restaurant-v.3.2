@@ -1,19 +1,18 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { MapPin, Phone } from 'lucide-react';
 
 export default function AboutUs() {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   return (
     <div className="fade-in">
-      <header className="page-header no-interaction" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${import.meta.env.BASE_URL}Images/44.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <header className="page-header no-interaction" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(/Images/hero_shawarma.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div className="container" style={{ textAlign: 'center', padding: '0 1rem' }}>
           <h1 className="scale-in" style={{ fontSize: 'clamp(2.2rem, 7vw, 5rem)', color: 'var(--gold)', textShadow: '0 8px 20px rgba(0,0,0,0.9)', marginBottom: '1rem' }}>
             {language === 'ar' ? 'قصتنا' : 'Our Story'}
           </h1>
           <p className="fade-in stagger-1" style={{ fontSize: 'clamp(1rem, 3vw, 1.6rem)', color: '#fff', fontWeight: 'bold', maxWidth: '800px', margin: '0 auto', lineHeight: '1.8' }}>
-            {language === 'ar' ? 'رحلة الشغف بالأكل الشامي الأصيل، من قلب دمشق إلى مائدتك.' : 'A journey of passion for authentic Levantine cuisine, from the heart of Damascus to your table.'}
+            {language === 'ar' ? 'رحلة ١٠ سنوات من الشغف بتقديم المأكولات السورية الأصيلة.' : 'A 10-year journey of passion for authentic Syrian cuisine.'}
           </p>
         </div>
       </header>
@@ -23,18 +22,18 @@ export default function AboutUs() {
 
           <div style={{ textAlign: 'center' }}>
             <h2 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', marginBottom: '2rem', color: 'var(--gold)' }}>
-              {language === 'ar' ? 'من نحن' : 'Who We Are'}
+              {language === 'ar' ? 'الخيار الأول في دمنهور' : '#1 Choice in Damanhour'}
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', color: 'var(--text-secondary)', fontSize: '1.2rem', lineHeight: '2' }}>
               {language === 'ar' ? (
                 <>
-                  <p>تأسس مطعم الدمشقي من شغف عميق بالطهي الشامي التقليدي. لقد أخذنا على عاتقنا مهمة الحفاظ على النكهات الأصيلة التي تميزت بها مدينة دمشق، أقدم مدينة مأهولة في العالم.</p>
-                  <p>نحن لا نقدم مجرد طعام، بل نقدم تجربة وثقافة. من التتبيلات السرية التي يتم تحضيرها يومياً، إلى اللحوم الطازجة والخبز الساخن، كل طبق يروي قصة عراقة وأصالة. فريقنا من الطهاة المحترفين يجمع بين الخبرة الطويلة والحب والشغف لتقديم أفضل تجربة تذوق لكل ضيف.</p>
+                  <p>تأسس مطعم الشرق للمأكولات السورية منذ أكثر من ١٠ سنوات ليكون نقلة نوعية في عالم المأكولات الشامية في دمنهور. لقد أخذنا على عاتقنا مهمة تقديم الطعم السوري الأصيل لكل عشاق الطعام.</p>
+                  <p>نحن لا نقدم مجرد طعام، بل نقدم قطعة من دمشق. من الشاورما المحمرة ببطء على السيخ، إلى أطباق الفتة الغنية والمخبوزات الطازجة، كل طبق يروي قصة التزامنا بالطعم الأصيل. فريقنا من أمهر الطهاة السوريين يضمن لك تجربة لا تُنسى.</p>
                 </>
               ) : (
                 <>
-                  <p>Al Demashqi Restaurant was founded on a deep passion for traditional Levantine cooking. We made it our mission to preserve the authentic flavors that define Damascus, one of the oldest continuously inhabited cities in the world.</p>
-                  <p>We don't just serve food; we serve culture and history. From our secret marinades prepared fresh daily, to our premium meats and freshly baked bread, every dish tells a story of heritage. Our team of master chefs combines decades of experience with an absolute love for their craft to deliver an unforgettable culinary experience.</p>
+                  <p>Al Sharq Syrian Restaurant was founded over 10 years ago to bring a paradigm shift to Levantine cuisine in Damanhour. We made it our mission to deliver authentic Syrian taste to every food lover.</p>
+                  <p>We don't just serve food; we offer a piece of Damascus. From slow-roasted shawarma on the spit to rich fatteh plates and fresh pastries, every dish tells a story of our commitment to authentic flavors. Our team of skilled Syrian chefs ensures an unforgettable experience.</p>
                 </>
               )}
             </div>
@@ -42,98 +41,24 @@ export default function AboutUs() {
 
           <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)' }}></div>
 
-          <div style={{ textAlign: 'center', width: '100%' }}>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', marginBottom: 'clamp(1.5rem, 4vw, 3rem)', color: 'var(--gold)' }}>
-              {language === 'ar' ? 'فروعنا' : 'Our Branches'}
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
-              {[
-                {
-                  en: { name: 'Main Branch', address: 'Al-Muhafaza St. - In front of Social Club' },
-                  ar: { name: 'الفرع الرئيسي', address: 'ش عبدالسلام الشاذلي - ش صيدلية مني المر بجوار موبيل امام النادي الاجتماع' },
-                  phones: '045/3149997 - 01094956760',
-                  mapLink: 'https://maps.app.goo.gl/ptV517u1JXwDMBt99'
-                },
-                {
-                  en: { name: 'Al-Rahibat Branch', address: 'Damanhour - Middle of Al-Rahibat St.' },
-                  ar: { name: 'فرع الراهبات', address: ' منتصف شارع الراهبات' },
-                  phones: '045/3220067 - 01060646298',
-                  mapLink: 'https://maps.google.com/?cid=1249500193850224387&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ'
-                },
-                {
-                  en: { name: 'Damanhour University Branch', address: 'Colleges Complex - University Tower' },
-                  ar: { name: 'فرع جامعة دمنهور', address: 'مجمع الكليات دمنهور - برج الجامعة' },
-                  phones: '045/3149998',
-                  mapLink: 'https://maps.app.goo.gl/Lmst7wFoFKmZiHLB9'
-                }
-              ].map((branch, i) => (
-                <div key={i} className={`fade-in stagger-${(i % 4) + 1}`} style={{ backgroundColor: 'var(--card-bg)', padding: '2.5rem 2rem', borderRadius: '12px', border: '1px solid var(--border-color)', transition: 'transform 0.3s ease, border-color 0.3s ease' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = 'var(--brand-red)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}>
-                  <h3 style={{ fontSize: '1.8rem', color: 'var(--text-primary)', marginBottom: '1.5rem' }}>
-                    {language === 'ar' ? branch.ar.name : branch.en.name}
-                  </h3>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '1rem', marginBottom: '1.2rem', color: 'var(--text-secondary)' }}>
-                    <MapPin color="var(--brand-red)" style={{ flexShrink: 0, marginTop: '0.2rem' }} />
-                    <span style={{ fontSize: '1.1rem', lineHeight: '1.6' }}>{language === 'ar' ? branch.ar.address : branch.en.address}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--text-secondary)' }}>
-                    <Phone color="var(--brand-red)" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{branch.phones}</span>
-                  </div>
-
-                  <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-                    <a
-                      href={branch.mapLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        width: '100%',
-                        padding: '0.8rem 1rem',
-                        backgroundColor: '#f59e0b', // amber-500
-                        color: '#09090b', // zinc-950
-                        borderRadius: '0.75rem', // xl
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem',
-                        textDecoration: 'none',
-                        transition: 'background-color 0.2s ease',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d97706'} // amber-600
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f59e0b'}
-                    >
-                      <MapPin size={18} />
-                      {language === 'ar' ? 'اضغط لعرض الموقع' : 'Show on Map'}
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ width: '100%', height: '1px', backgroundColor: 'var(--border-color)', margin: '2rem 0' }}></div>
-
           <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 'clamp(2rem, 5vw, 4rem)', alignItems: 'center', marginBottom: '4rem' }}>
             <div style={{ flex: '1 1 280px' }}>
               <h2 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', marginBottom: '1.5rem', color: 'var(--gold)' }}>
-                {language === 'ar' ? 'تصفح القائمة الأصلية' : 'View Original Menu'}
+                {language === 'ar' ? 'شهادة سلامة الغذاء' : 'Food Safety Certificate'}
               </h2>
               <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
                 {language === 'ar'
-                  ? 'يمكنك هنا تصفح صفحات المنيو الأصلية الخاصة بنا للتعرف على جميع الأصناف بالتفصيل، من الشاورما السورية الأصيلة والبروستد، إلى البيتزا والمعجنات الطازجة.'
-                  : 'Here you can browse our original physical menu pages to see all our items in detail, from authentic Syrian Shawarma and Broasted, to fresh Pizzas and pastries.'}
+                  ? 'نفخر في مطعم الشرق بحصولنا على "شهادة سلامة الغذاء" والتي تضمن تطبيق أعلى معايير الجودة والنظافة. كل مكوناتنا طازجة ونحرص دائماً على صحة وسلامة عملائنا الكرام لضمان تجربة طعام آمنة ولذيذة.'
+                  : 'At Al Sharq, we are proud to hold the "Food Safety Certificate", ensuring the highest standards of quality and hygiene. All our ingredients are fresh, and we always prioritize the health and safety of our valued customers.'}
               </p>
             </div>
 
             <div style={{ flex: '1 1 400px', display: 'flex', gap: '1.5rem' }}>
               <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', border: '2px solid var(--border-color)', transition: 'transform 0.3s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                <img src={`${import.meta.env.BASE_URL}Images/44.png`} alt="Menu Page 1" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                <img src="/Images/fatteh_syrian.png" alt="Syrian Fatteh" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', border: '2px solid var(--border-color)', transition: 'transform 0.3s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                <img src={`${import.meta.env.BASE_URL}Images/45.png`} alt="Menu Page 2" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                <img src="/Images/qalbouza.png" alt="Qalbouza" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             </div>
           </div>

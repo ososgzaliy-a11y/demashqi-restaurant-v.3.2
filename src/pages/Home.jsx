@@ -6,11 +6,11 @@ import { useCart } from '../context/CartContext';
 import ProductModal from '../components/ProductModal';
 
 // Import authentic images
-import HeroImage from '../../Images/1.jpeg';
-import StoryImage from '../../Images/7.png';
-import Dish1Image from '../../Images/17.png';
-import Dish2Image from '../../Images/22.png';
-import Dish3Image from '../../Images/5.png';
+const HeroImage = '/Images/hero_shawarma.png';
+const StoryImage = '/Images/hero_shawarma.png'; // Using hero as story placeholder
+const Dish1Image = '/Images/hero_shawarma.png'; // Shawarma
+const Dish2Image = '/Images/fatteh_syrian.png'; // Fatteh
+const Dish3Image = '/Images/pizza_crispy.png'; // Crispy Chicken Pizza
 import OffersSlider from '../components/OffersSlider';
 
 export default function Home() {
@@ -140,9 +140,9 @@ export default function Home() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 'clamp(1.5rem, 4vw, 2rem)' }}>
             {[
-              { id: 'feat-1', name_en: t('featured.dish1.name'), name_ar: t('featured.dish1.name'), desc_en: t('featured.dish1.desc'), desc_ar: t('featured.dish1.desc'), price: 60, displayPrice: '£60', img: Dish1Image, category_key: 'featured' },
-              { id: 'feat-2', name_en: t('featured.dish2.name'), name_ar: t('featured.dish2.name'), desc_en: t('featured.dish2.desc'), desc_ar: t('featured.dish2.desc'), price: 180, displayPrice: '£180', img: Dish2Image, category_key: 'featured' },
-              { id: 'feat-3', name_en: t('featured.dish3.name'), name_ar: t('featured.dish3.name'), desc_en: t('featured.dish3.desc'), desc_ar: t('featured.dish3.desc'), price: 90, displayPrice: '£90', img: Dish3Image, category_key: 'featured' }
+              { id: 'feat-1', name_en: t('featured.dish1.name'), name_ar: t('featured.dish1.name'), desc_en: t('featured.dish1.desc'), desc_ar: t('featured.dish1.desc'), price: 250, displayPrice: '250', img: Dish1Image, category_key: 'featured' },
+              { id: 'feat-2', name_en: t('featured.dish2.name'), name_ar: t('featured.dish2.name'), desc_en: t('featured.dish2.desc'), desc_ar: t('featured.dish2.desc'), price: 280, displayPrice: '280', img: Dish2Image, category_key: 'featured' },
+              { id: 'feat-3', name_en: t('featured.dish3.name'), name_ar: t('featured.dish3.name'), desc_en: t('featured.dish3.desc'), desc_ar: t('featured.dish3.desc'), price: 120, displayPrice: '120', img: Dish3Image, category_key: 'featured' }
             ].map((dish, i) => (
               <div
                 key={i}

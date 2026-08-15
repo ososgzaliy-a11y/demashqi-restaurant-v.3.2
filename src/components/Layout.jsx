@@ -5,7 +5,8 @@ import { useCart } from '../context/CartContext';
 import { useLanguage } from '../context/LanguageContext';
 import LogoImg from '../../Images/2.png';
 import Checkout from '../pages/Checkout';
-
+import FloatingSocialMenu from './FloatingSocialMenu';
+import SocialMediaFooter from './SocialMediaFooter';
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,11 +54,12 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar">
+    <>
+      <nav className="navbar">
       <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* Logo */}
         <a href="/" onClick={(e) => handleResetNavigation(e, '/')} className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1100, cursor: 'pointer' }}>
-          <img src={LogoImg} alt="Al Demashqi Logo" style={{ height: 'clamp(32px, 8vw, 44px)', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
+          <img src={LogoImg} alt="Bait El-Asmak Logo" style={{ height: 'clamp(32px, 8vw, 44px)', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
         </a>
 
         {/* Desktop nav links */}
@@ -74,13 +76,13 @@ const Navbar = () => {
             )
           ))}
 
-          <button onClick={toggleLanguage} className="lang-toggle" style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}>
+          <button onClick={toggleLanguage} className="lang-toggle" style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'transparent', color: '#fff', border: '1px solid var(--border-color)', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}>
             <Globe size={16} />
             <span style={{ fontWeight: 'bold' }}>{language === 'en' ? 'عربي' : 'EN'}</span>
           </button>
 
           {path !== '/admin-dashboard' && path !== '/manager-dashboard' && (
-            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCheckout(); }} className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCheckout(); }} className={path === '/checkout' ? 'nav-link active' : 'nav-link'} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
               <ShoppingCart size={20} />
               {cartItemCount > 0 && (
                 <span style={{ position: 'absolute', top: '-8px', right: '-12px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px' }}>
@@ -94,7 +96,7 @@ const Navbar = () => {
         {/* Mobile: cart + hamburger */}
         <div className="nav-mobile-controls" style={{ display: 'none', alignItems: 'center', gap: '1rem', zIndex: 1100 }}>
           {path !== '/admin-dashboard' && path !== '/manager-dashboard' && (
-            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCheckout(); }} style={{ display: 'flex', alignItems: 'center', position: 'relative', color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCheckout(); }} style={{ display: 'flex', alignItems: 'center', position: 'relative', color: '#fff', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <ShoppingCart size={22} />
               {cartItemCount > 0 && (
                 <span style={{ position: 'absolute', top: '-8px', right: '-10px', background: 'var(--gold)', color: 'var(--bg-color)', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
@@ -106,53 +108,59 @@ const Navbar = () => {
           <button
             onClick={() => setMenuOpen(prev => !prev)}
             aria-label="Toggle menu"
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
           >
             {menuOpen ? <X size={26} /> : <Menu size={26} />}
           </button>
         </div>
       </div>
+    </nav>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Backdrop */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          zIndex: 1040,
+          opacity: menuOpen ? 1 : 0,
+          pointerEvents: menuOpen ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+          backdropFilter: 'blur(4px)'
+        }}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Mobile Dropdown Menu Window */}
       <div
-        className="mobile-menu glass-panel"
+        className="mobile-menu"
         style={{
           position: 'fixed',
           top: 0,
-          left: 0,
-          right: 0,
           bottom: 0,
+          right: language === 'ar' ? 'auto' : 0,
+          left: language === 'ar' ? 0 : 'auto',
+          width: '280px',
+          maxWidth: '85vw',
+          backgroundColor: 'var(--card-bg)',
           zIndex: 1050,
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '2rem',
-          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.25s cubic-bezier(0.1, 0.7, 0.1, 1)', // Fast, snappy, frictionless
-          willChange: 'transform', // Hardware acceleration
-          touchAction: 'pan-y', // Improve touch responsiveness
-          WebkitBackfaceVisibility: 'hidden',
-          backfaceVisibility: 'hidden',
-          WebkitPerspective: 1000,
-          perspective: 1000,
-        }}
-        onTouchStart={(e) => {
-          window.menuTouchStartX = e.touches[0].clientX;
-        }}
-        onTouchEnd={(e) => {
-          if (!window.menuTouchStartX) return;
-          const touchEndX = e.changedTouches[0].clientX;
-          const distance = touchEndX - window.menuTouchStartX;
-          const isRTL = language === 'ar';
-          
-          // Swipe to close (swipe right for LTR, swipe left for RTL)
-          if (isRTL ? distance < -50 : distance > 50) {
-            setMenuOpen(false);
-          }
-          window.menuTouchStartX = null;
+          padding: '5rem 1.5rem 2rem',
+          gap: '1rem',
+          transform: menuOpen ? 'translateX(0)' : `translateX(${language === 'ar' ? '-100%' : '100%'})`,
+          transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          boxShadow: language === 'ar' ? '5px 0 20px rgba(0,0,0,0.1)' : '-5px 0 20px rgba(0,0,0,0.1)',
+          overflowY: 'auto'
         }}
       >
+        <button 
+          onClick={() => setMenuOpen(false)}
+          style={{ position: 'absolute', top: '20px', right: language === 'ar' ? 'auto' : '20px', left: language === 'ar' ? '20px' : 'auto', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+        >
+          <X size={28} />
+        </button>
+
         {navLinks.map(link => (
           link.isResetLink ? (
             <a
@@ -160,15 +168,15 @@ const Navbar = () => {
               href={link.to}
               onClick={(e) => handleResetNavigation(e, link.to)}
               style={{
-                fontSize: 'clamp(1.5rem, 5vw, 1.8rem)',
+                fontSize: '1.3rem',
                 fontWeight: '700',
-                color: path === link.to ? 'var(--gold)' : 'var(--text-primary)',
+                color: path === link.to ? 'var(--brand-red)' : 'var(--text-primary)',
                 textDecoration: 'none',
-                borderBottom: path === link.to ? '2px solid var(--brand-red)' : '2px solid transparent',
-                padding: '0.5rem 1rem',
+                padding: '0.8rem 1rem',
                 width: '100%',
-                textAlign: 'center',
-                transition: 'color 0.2s',
+                textAlign: language === 'ar' ? 'right' : 'left',
+                borderBottom: '1px solid var(--border-color)',
+                transition: 'all 0.2s',
               }}
             >
               {link.label}
@@ -179,15 +187,15 @@ const Navbar = () => {
               to={link.to}
               onClick={() => setMenuOpen(false)}
               style={{
-                fontSize: 'clamp(1.5rem, 5vw, 1.8rem)',
+                fontSize: '1.3rem',
                 fontWeight: '700',
-                color: path === link.to ? 'var(--gold)' : 'var(--text-primary)',
+                color: path === link.to ? 'var(--brand-red)' : 'var(--text-primary)',
                 textDecoration: 'none',
-                borderBottom: path === link.to ? '2px solid var(--brand-red)' : '2px solid transparent',
-                padding: '0.5rem 1rem',
+                padding: '0.8rem 1rem',
                 width: '100%',
-                textAlign: 'center',
-                transition: 'color 0.2s',
+                textAlign: language === 'ar' ? 'right' : 'left',
+                borderBottom: '1px solid var(--border-color)',
+                transition: 'all 0.2s',
               }}
             >
               {link.label}
@@ -196,23 +204,24 @@ const Navbar = () => {
         ))}
         <button
           onClick={() => { toggleLanguage(); setMenuOpen(false); }}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.6rem 1.2rem', borderRadius: '6px', cursor: 'pointer', fontSize: '1.1rem', marginTop: '1rem' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'transparent', color: 'var(--text-primary)', border: '2px solid var(--brand-red)', padding: '0.8rem 1.5rem', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', marginTop: '1.5rem', fontWeight: 'bold', width: '100%' }}
         >
           <Globe size={18} />
-          <span style={{ fontWeight: 'bold' }}>{language === 'en' ? 'عربي' : 'EN'}</span>
+          <span>{language === 'en' ? 'عربي' : 'EN'}</span>
         </button>
       </div>
-    </nav>
+    </>
   );
 };
 
 const Footer = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   return (
     <footer className="footer no-interaction">
       <div className="container">
         <div className="footer-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <img src={LogoImg} alt="Al Demashqi Logo" draggable="false" style={{ height: '80px', marginBottom: '1rem', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
+          <img src={LogoImg} alt="Bait El-Asmak Logo" draggable="false" style={{ height: '80px', marginBottom: '1rem', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.5))' }} />
           <p>{t('footer.desc')}</p>
         </div>
         <div className="nav-links" style={{ justifyContent: 'center', marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
@@ -223,14 +232,13 @@ const Footer = () => {
           <Link to="/contact" className="nav-link">{t('nav.contact')}</Link>
           <Link to="/contact" className="nav-link" style={{ color: 'var(--brand-red)' }}>{t('footer.feedback')}</Link>
         </div>
+        <SocialMediaFooter customLogo={LogoImg} />
         <p
           onClick={() => {
             window.__adminClicks = (window.__adminClicks || 0) + 1;
             if (window.__adminClicks >= 3) {
               window.__adminClicks = 0;
-              window.location.hostname === 'localhost' 
-                ? window.location.assign('/demashqi-restaurant-v.3.2/admin-dashboard') 
-                : window.location.assign('/admin-dashboard');
+              navigate('/admin-dashboard');
             }
           }}
           style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', userSelect: 'none' }}
@@ -364,6 +372,7 @@ export default function Layout({ children }) {
       <main>{children}</main>
       <Footer />
       <FloatingCart />
+      <FloatingSocialMenu />
       
       {/* Success Toast Notification */}
       <div style={{

@@ -294,16 +294,16 @@ export default function Reservations() {
                 {language === 'ar' ? 'تفاصيل الاتصال' : 'Contact Details'}
               </label>
               <div className="responsive-grid-2">
-                <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder={language === 'ar' ? 'الاسم الكامل' : 'Full Name'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
-                <input type="number" id="guests" name="guests" min="1" max="12" value={formData.guests} onChange={handleChange} required placeholder={language === 'ar' ? 'عدد الأشخاص' : 'Number of Guests'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+                <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder={language === 'ar' ? 'الاسم الكامل' : 'Full Name'} style={{ padding: '1rem', borderRadius: '8px', border: '2px solid #000', backgroundColor: '#fff', color: '#000', fontSize: '1.1rem' }} />
+                <input type="number" id="guests" name="guests" min="1" max="12" value={formData.guests} onChange={handleChange} required placeholder={language === 'ar' ? 'عدد الأشخاص' : 'Number of Guests'} style={{ padding: '1rem', borderRadius: '8px', border: '2px solid #000', backgroundColor: '#fff', color: '#000', fontSize: '1.1rem' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} required maxLength="11" placeholder={language === 'ar' ? 'رقم الهاتف' : 'Phone Number'} style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} required maxLength="11" placeholder={language === 'ar' ? 'رقم الهاتف' : 'Phone Number'} style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: '2px solid #000', backgroundColor: '#fff', color: '#000', fontSize: '1.1rem' }} />
                 <span style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', color: '#25D366', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <span>📱</span>{language === 'ar' ? 'داعم للواتساب *' : 'Supports WhatsApp *'}
                 </span>
               </div>
-              <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} placeholder={language === 'ar' ? 'البريد الإلكتروني (اختياري)' : 'Email Address (optional)'} style={{ padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1.1rem' }} />
+              <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} placeholder={language === 'ar' ? 'البريد الإلكتروني (اختياري)' : 'Email Address (optional)'} style={{ padding: '1rem', borderRadius: '8px', border: '2px solid #000', backgroundColor: '#fff', color: '#000', fontSize: '1.1rem' }} />
             </div>
 
             {/* Table selection removed entirely */}

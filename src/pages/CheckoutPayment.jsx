@@ -14,21 +14,22 @@ export default function CheckoutPayment() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [iframeUrl, setIframeUrl] = useState(null);
   
   // Check if we are returning from Paymob (Callback)
   const isSuccessCallback = searchParams.get('success') === 'true';
   const isFailureCallback = searchParams.get('success') === 'false';
+  const isPendingCallback = searchParams.get('pending') === 'true';
   const hasCallback = searchParams.has('success');
+  const txnResponseCode = searchParams.get('txn_response_code');
 
   const API = import.meta.env.VITE_API_BASE_URL || '';
   const isCreatingOrderRef = React.useRef(false);
   const [orderFinalized, setOrderFinalized] = useState(false);
 
   useEffect(() => {
-    // If it's a callback, handle it immediately
+    // We only expect this page to be hit as a callback
     if (hasCallback) {
-      if (isSuccessCallback && !isCreatingOrderRef.current && !orderFinalized) {
+      if (isSuccessCallback && !isPendingCallback && !isCreatingOrderRef.current && !orderFinalized) {
         isCreatingOrderRef.current = true;
         const pendingOrderStr = sessionStorage.getItem('pendingOrder');
         if (pendingOrderStr) {
@@ -64,52 +65,14 @@ export default function CheckoutPayment() {
           // If no pendingOrder is found but success is true, it might have been processed already
           setLoading(false);
         }
-      } else if (!isSuccessCallback) {
+      } else {
         setLoading(false);
       }
-      return;
+    } else {
+      setError(language === 'ar' ? 'مسار غير صالح' : 'Invalid route access');
+      setLoading(false);
     }
-
-    // Otherwise, we are initializing a new payment
-    const initPayment = async () => {
-      const pendingOrderStr = sessionStorage.getItem('pendingOrder');
-      if (!pendingOrderStr) {
-        setError(language === 'ar' ? 'بيانات الدفع مفقودة' : 'Payment data missing');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const state = JSON.parse(pendingOrderStr);
-        const res = await fetch(`${API}/api/payment/paymob`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: state.tempOrderId,
-            total: state.total,
-            items: state.items,
-            name: state.name,
-            address: state.address,
-            phone: state.phone
-          })
-        });
-
-        const data = await res.json();
-        if (data.success && data.iframeUrl) {
-          setIframeUrl(data.iframeUrl);
-        } else {
-          setError(language === 'ar' ? 'حدث مشكلة في جلب بيانات الدفع' : 'Failed to initialize payment');
-        }
-      } catch (err) {
-        console.error(err);
-        setError(language === 'ar' ? 'حدث مشكلة في الاتصال بالخادم' : 'Server connection error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initPayment();
-  }, [hasCallback, language, isSuccessCallback, clearCart, API, orderFinalized]);
+  }, [hasCallback, language, isSuccessCallback, isPendingCallback, clearCart, API, orderFinalized]);
 
   if (loading) {
     return (
@@ -177,23 +140,5 @@ export default function CheckoutPayment() {
     );
   }
 
-  return (
-    <div style={{ width: '100%', maxWidth: '800px', margin: '4rem auto', minHeight: '70vh', padding: '1rem' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--text-primary)' }}>
-        {language === 'ar' ? 'إتمام الدفع' : 'Complete Payment'}
-      </h2>
-      
-      {iframeUrl && (
-        <div style={{ width: '100%', height: '600px', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-          <iframe 
-            src={iframeUrl}
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            title="Payment Gateway"
-          />
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }

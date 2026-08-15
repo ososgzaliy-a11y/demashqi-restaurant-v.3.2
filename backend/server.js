@@ -124,7 +124,7 @@ const crypto = require('crypto');
 // Paymob API Endpoints
 app.post('/api/payment/paymob', async (req, res) => {
   try {
-    const { total, address, phone, name, items, orderId, integration_id } = req.body;
+    const { total, address, phone, name, items, orderId, integration_id, paymentMethod, walletNumber } = req.body;
     if (!orderId) {
       return res.status(400).json({ success: false, error: 'orderId is required' });
     }
@@ -191,6 +191,13 @@ app.post('/api/payment/paymob', async (req, res) => {
       state: "NA"
     };
 
+    let integId;
+    if (paymentMethod === 'wallets' && process.env.PAYMOB_WALLET_INTEGRATION_ID) {
+      integId = parseInt(process.env.PAYMOB_WALLET_INTEGRATION_ID);
+    } else {
+      integId = integration_id ? parseInt(integration_id) : parseInt(process.env.PAYMOB_INTEGRATION_ID);
+    }
+
     const keyRes = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -201,7 +208,7 @@ app.post('/api/payment/paymob', async (req, res) => {
         order_id: paymob_order_id,
         billing_data: billingData,
         currency: 'EGP',
-        integration_id: integration_id ? parseInt(integration_id) : parseInt(process.env.PAYMOB_INTEGRATION_ID)
+        integration_id: integId
       })
     });
     if (!keyRes.ok) {
@@ -210,10 +217,26 @@ app.post('/api/payment/paymob', async (req, res) => {
         throw new Error(`Paymob Payment Key request failed: ${err}`);
     }
     const keyData = await keyRes.json();
+    const paymentKey = keyData.token;
 
-    const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${process.env.PAYMOB_IFRAME_ID}?payment_token=${keyData.token}`;
+    let redirectUrl = `https://accept.paymob.com/api/acceptance/iframes/${process.env.PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
 
-    res.json({ success: true, paymentKey: keyData.token, iframeUrl });
+    if (paymentMethod === 'wallets' && walletNumber) {
+      const walletRes = await fetch('https://accept.paymob.com/api/acceptance/payments/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: { identifier: walletNumber, subtype: "WALLET" },
+          payment_token: paymentKey
+        })
+      });
+      const walletData = await walletRes.json();
+      if (walletData.redirect_url) {
+        redirectUrl = walletData.redirect_url;
+      }
+    }
+
+    res.json({ success: true, paymentKey, redirectUrl });
   } catch (error) {
     console.error('Paymob backend error:', error.message || error);
     res.status(500).json({ success: false, error: error.message || 'Internal server error' });

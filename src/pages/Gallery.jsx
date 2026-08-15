@@ -15,7 +15,7 @@ export default function Gallery() {
       <header className="page-header" style={{ padding: '8rem 0 3rem' }}>
         <div className="container">
           <h1>Our Gallery</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>A glimpse into the Demashqi experience.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>A glimpse into the Bait El-Asmak experience.</p>
         </div>
       </header>
 

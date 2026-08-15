@@ -146,7 +146,7 @@ export default function OrderTracking() {
               borderRadius: '50px',
               border: '2px solid var(--border-color)',
               backgroundColor: 'var(--card-bg)',
-              color: '#fff',
+              color: 'var(--text-primary)',
               fontSize: 'clamp(1rem, 3vw, 1.1rem)',
               minHeight: '48px',
               textAlign: isRTL ? 'right' : 'left',

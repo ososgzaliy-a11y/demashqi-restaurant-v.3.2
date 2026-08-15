@@ -1,16 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 
 :root {
-  --bg-color: #080808;
-  --text-primary: #f9f9f9;
-  --text-secondary: #cccccc;
-  --gold: #E5B942;
+  --bg-color: #faf7f2; /* Warm creamy background */
+  --text-primary: #2b1d0f; /* Dark wood brown */
+  --text-secondary: #5c4d3c; /* Lighter brown/grey */
+  --gold: #D4AF37;
   --gold-hover: #F2CA5C;
-  --brand-red: #C8102E;
-  --brand-red-hover: #A30D25;
-  --dark-overlay: rgba(8, 8, 8, 0.85);
-  --card-bg: #111111;
-  --border-color: #222222;
+  --brand-red: #8b0000; /* Deep crimson red */
+  --brand-red-hover: #a52a2a;
+  --dark-overlay: rgba(43, 29, 15, 0.85);
+  --card-bg: #ffffff; /* Clean white for cards */
+  --border-color: #e6dfd3; /* Soft wood tone border */
+  --olive-green: #556b2f; /* Olive green */
 }
 
 * {
@@ -59,6 +60,11 @@ body {
 input, textarea {
   -webkit-user-select: auto !important;
   user-select: auto !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #000;
+  opacity: 1; /* Override Firefox default opacity */
 }
 
 h1,
@@ -261,9 +267,9 @@ select {
    Buttons
    ============================================ */
 .btn-primary {
-  background-color: var(--brand-red);
-  color: var(--gold);
-  border: 1px solid var(--brand-red);
+  background-color: #B38A22;
+  color: #fff;
+  border: 1px solid #B38A22;
   padding: 1rem 2rem;
   font-size: 1.1rem;
   font-weight: 700;
@@ -271,11 +277,11 @@ select {
 }
 
 .btn-primary:hover {
-  background-color: var(--brand-red-hover);
-  border-color: var(--brand-red-hover);
-  color: var(--gold-hover);
+  background-color: var(--gold);
+  border-color: var(--gold);
+  color: #fff;
   transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 20px rgba(200, 16, 46, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.5);
 }
 
 .btn-primary:active {
@@ -311,9 +317,13 @@ select {
   position: absolute;
   top: 0;
   width: 100%;
-  background-color: transparent;
+  background-color: var(--dark-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
   z-index: 1000;
-  padding: 1.2rem 0;
+  padding: 1rem 0;
+  color: #fff;
 }
 
 .navbar .container {
@@ -340,6 +350,11 @@ select {
   font-weight: 600;
   position: relative;
   padding-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.navbar .nav-link {
+  color: #fff;
 }
 
 .nav-link::after {

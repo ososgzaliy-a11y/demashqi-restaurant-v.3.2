@@ -43,10 +43,14 @@ export default function ContactUs() {
 
   return (
     <div className="fade-in">
-      <header className="page-header" style={{ padding: 'clamp(5rem, 10vw, 8rem) 0 clamp(1.5rem, 3vw, 3rem)' }}>
-        <div className="container">
-          <h1>{t('contact.title')}</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>{t('contact.subtitle')}</p>
+      <header className="page-header no-interaction" style={{ minHeight: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(/Images/hero_shawarma.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div className="container" style={{ textAlign: 'center', padding: '0 1rem' }}>
+          <h1 className="scale-in" style={{ fontSize: 'clamp(2.2rem, 7vw, 5rem)', color: 'var(--gold)', textShadow: '0 8px 20px rgba(0,0,0,0.9)', marginBottom: '1rem' }}>
+            {t('contact.title')}
+          </h1>
+          <p className="fade-in stagger-1" style={{ fontSize: 'clamp(1rem, 3vw, 1.6rem)', color: '#fff', fontWeight: 'bold', maxWidth: '800px', margin: '0 auto', lineHeight: '1.8' }}>
+            {t('contact.subtitle')}
+          </p>
         </div>
       </header>
 

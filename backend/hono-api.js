@@ -313,12 +313,13 @@ app.get('/api/admin/contacts', async (c) => {
 // Paymob Endpoint
 app.post('/api/payment/paymob', async (c) => {
   try {
-    const { total, address, phone, name, items, orderId, integration_id } = await c.req.json();
+    const { total, address, phone, name, items, orderId, integration_id, paymentMethod, walletNumber } = await c.req.json();
     if (!orderId) return c.json({ success: false, error: 'orderId is required' }, 400);
     const amount_cents = Math.round(total * 100);
     
     const PAYMOB_API_KEY = globalThis.PAYMOB_API_KEY || process.env.PAYMOB_API_KEY;
     const PAYMOB_IFRAME_ID = globalThis.PAYMOB_IFRAME_ID || process.env.PAYMOB_IFRAME_ID;
+    const PAYMOB_WALLET_INTEGRATION_ID = globalThis.PAYMOB_WALLET_INTEGRATION_ID || process.env.PAYMOB_WALLET_INTEGRATION_ID;
     
     // Auth
     let res = await fetch('https://accept.paymob.com/api/auth/tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: PAYMOB_API_KEY }) });
@@ -338,14 +339,39 @@ app.post('/api/payment/paymob', async (c) => {
       apartment: "NA", email: "customer@demashqi.com", floor: "NA", first_name: (name||'C').split(' ')[0], street: address || "NA", building: "NA", phone_number: phone || "+2010",
       shipping_method: "NA", postal_code: "NA", city: "NA", country: "EG", last_name: "Customer", state: "NA"
     };
-    const integId = integration_id ? parseInt(integration_id) : parseInt(globalThis.PAYMOB_INTEGRATION_ID || process.env.PAYMOB_INTEGRATION_ID);
+    
+    let integId;
+    if (paymentMethod === 'wallets' && PAYMOB_WALLET_INTEGRATION_ID) {
+      integId = parseInt(PAYMOB_WALLET_INTEGRATION_ID);
+    } else {
+      integId = integration_id ? parseInt(integration_id) : parseInt(globalThis.PAYMOB_INTEGRATION_ID || process.env.PAYMOB_INTEGRATION_ID);
+    }
     
     res = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       auth_token: token, amount_cents, expiration: 3600, order_id: paymob_order_id, billing_data: billingData, currency: 'EGP', integration_id: integId
     })});
     data = await res.json();
+    const paymentKey = data.token;
     
-    return c.json({ success: true, paymentKey: data.token, iframeUrl: `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${data.token}` });
+    let redirectUrl = `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`;
+    
+    // If Wallet, fetch the mobile wallet redirect URL
+    if (paymentMethod === 'wallets' && walletNumber) {
+      const walletRes = await fetch('https://accept.paymob.com/api/acceptance/payments/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: { identifier: walletNumber, subtype: "WALLET" },
+          payment_token: paymentKey
+        })
+      });
+      const walletData = await walletRes.json();
+      if (walletData.redirect_url) {
+        redirectUrl = walletData.redirect_url;
+      }
+    }
+    
+    return c.json({ success: true, paymentKey, redirectUrl });
   } catch (error) {
     return c.json({ success: false, error: error.message }, 500);
   }
@@ -353,12 +379,55 @@ app.post('/api/payment/paymob', async (c) => {
 
 // Paymob Webhook
 app.post('/api/payment/webhook', async (c) => {
-  // Skipping HMAC check for brevity in Cloudflare implementation, but you can implement it.
   try {
-    const body = await c.req.json();
+    const url = new URL(c.req.url);
+    const providedHmac = url.searchParams.get('hmac');
+    const hmacSecret = globalThis.PAYMOB_HMAC_SECRET || process.env.PAYMOB_HMAC_SECRET;
+    
+    const bodyText = await c.req.text();
+    const body = JSON.parse(bodyText);
     const obj = body.obj;
     if (!obj) return c.text('No object provided', 400);
-    const merchantOrderId = obj.order.merchant_order_id;
+
+    if (providedHmac && hmacSecret) {
+      const amount_cents = obj.amount_cents;
+      const created_at = obj.created_at;
+      const currency = obj.currency;
+      const error_occured = obj.error_occured;
+      const has_parent_transaction = obj.has_parent_transaction;
+      const id = obj.id;
+      const integration_id = obj.integration_id;
+      const is_3d_secure = obj.is_3d_secure;
+      const is_auth = obj.is_auth;
+      const is_capture = obj.is_capture;
+      const is_refunded = obj.is_refunded;
+      const is_standalone_payment = obj.is_standalone_payment;
+      const is_voided = obj.is_voided;
+      const order_id = obj.order?.id;
+      const owner = obj.owner;
+      const pending = obj.pending;
+      const source_data_pan = obj.source_data?.pan || '';
+      const source_data_sub_type = obj.source_data?.sub_type || '';
+      const source_data_type = obj.source_data?.type || '';
+      const success = obj.success;
+
+      const hmacString = `${amount_cents}${created_at}${currency}${error_occured}${has_parent_transaction}${id}${integration_id}${is_3d_secure}${is_auth}${is_capture}${is_refunded}${is_standalone_payment}${is_voided}${order_id}${owner}${pending}${source_data_pan}${source_data_sub_type}${source_data_type}${success}`;
+      
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(hmacSecret);
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw', keyData, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']
+      );
+      const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(hmacString));
+      const calculatedHmac = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      if (calculatedHmac !== providedHmac) {
+        console.error('Paymob HMAC validation failed');
+        return c.text('Unauthorized', 401);
+      }
+    }
+
+    const merchantOrderId = obj.order?.merchant_order_id;
     if (typeof merchantOrderId === 'string' && merchantOrderId.startsWith('temp_')) return c.text('OK', 200);
     
     if (obj.success) {

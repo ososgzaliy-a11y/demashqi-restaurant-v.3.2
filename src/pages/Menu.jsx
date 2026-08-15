@@ -8,7 +8,7 @@ import { searchMenuItems } from '../utils/searchUtils';
 import OffersSlider from '../components/OffersSlider';
 import ProductModal from '../components/ProductModal';
 
-const MenuHero = `${import.meta.env.BASE_URL}Images/31.png`;
+const MenuHero = `/Images/hero_shawarma.png`;
 
 export default function Menu() {
   const API = import.meta.env.VITE_API_BASE_URL || '';
@@ -77,80 +77,73 @@ export default function Menu() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const exactImageMap = {
-    'sh_sand_chicken': '7.png', 'sh_sand_meat': '26.png',
-    'pz_margherita': '5.png', 'app_fatteh': '8.png',
-    'br_4': '11.png', 'dr_cocktail': '14.png',
-    'dr_latte': '15.png', 'cr_nutella': '17.png',
-  };
-  const getImageForKey = (key) => exactImageMap[key]
-    ? `${import.meta.env.BASE_URL}Images/${exactImageMap[key]}`
-    : null;
-
   const getFallbackImageForCategory = (categoryKey) => {
     switch(categoryKey) {
-      case 'shawarma': return 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?q=80&w=800';
-      case 'grills': return 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=800';
-      case 'appetizers': return 'https://images.unsplash.com/photo-1541518763669-27fef04b14e8?q=80&w=800';
-      case 'burgers': return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=800';
-      case 'pizza_pastries': return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=800';
-      case 'desserts': return 'https://images.unsplash.com/photo-1519676867240-f03562e64548?q=80&w=800';
-      case 'drinks': return 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?q=80&w=800';
-      default: return `${import.meta.env.BASE_URL}Images/31.png`;
+      case 'shawarma': return '/Images/hero_shawarma.png';
+      case 'fatteh': return '/Images/fatteh_syrian.png';
+      case 'pizza': return '/Images/pizza_crispy.png';
+      case 'inventions': return '/Images/qalbouza.png';
+      default: return `/Images/hero_shawarma.png`;
     }
   };
 
   useEffect(() => {
-    const fetchMenu = async () => {
+    const loadMenu = () => {
+      setLoading(true);
       try {
-        const [catRes, prodRes] = await Promise.all([
-          fetch(`${API}/api/categories`),
-          fetch(`${API}/api/products`)
-        ]);
-        const dbCats = await catRes.json();
-        const dbProds = await prodRes.json();
+        const catsObj = t('menu.categories');
+        const itemsObj = t('menu.items');
+        
+        // Define category keys and items mapping
+        const catKeys = ['shawarma', 'fatteh', 'pizza', 'inventions'];
+        const itemsMapping = {
+          'shawarma': ['sh_1', 'sh_2'],
+          'fatteh': ['ft_1', 'ft_2'],
+          'pizza': ['pz_1', 'pz_2'],
+          'inventions': ['inv_1']
+        };
 
-        setProducts(dbProds);
-
-        // Group products by category
-        const builtCats = dbCats.map(cat => {
-          const catItems = dbProds.filter(p => p.category_key === cat.key).map(p => {
-            // Normalise price: DB may return it as a string-encoded JSON
-            let price = p.price;
-            if (typeof price === 'string') {
-              try { price = JSON.parse(price); } catch { price = Number(price) || price; }
-            }
-            return {
-              ...p,
-              price,
-              id: p.id,
-              name: language === 'ar' ? p.name_ar : p.name_en,
-              desc: language === 'ar' ? p.desc_ar : p.desc_en,
-              category_key: cat.key,
-              img: p.img || getImageForKey(p.key) || getFallbackImageForCategory(cat.key),
-              // Also normalise arrays
-              sauces: Array.isArray(p.sauces) ? p.sauces : (typeof p.sauces === 'string' ? JSON.parse(p.sauces || '[]') : []),
-              ingredients: Array.isArray(p.ingredients) ? p.ingredients : (typeof p.ingredients === 'string' ? JSON.parse(p.ingredients || '[]') : []),
+        const allProducts = [];
+        
+        const builtCats = catKeys.map(catKey => {
+          const catTitle = catsObj[catKey] || catKey;
+          const itemKeys = itemsMapping[catKey] || [];
+          
+          const catItems = itemKeys.map(ik => {
+            const itemData = itemsObj[ik];
+            if (!itemData) return null;
+            
+            const prod = {
+              id: ik,
+              name: itemData.name,
+              desc: itemData.desc,
+              price: itemData.price,
+              category_key: catKey,
+              img: getFallbackImageForCategory(catKey)
             };
-          });
+            allProducts.push(prod);
+            return prod;
+          }).filter(Boolean);
+          
           return {
-            key: cat.key,
-            title: language === 'ar' ? cat.name_ar : cat.name_en,
+            key: catKey,
+            title: catTitle,
             items: catItems,
-            img: getImageForKey(catItems[0]?.key) || getFallbackImageForCategory(cat.key)
+            img: getFallbackImageForCategory(catKey)
           };
         });
 
-        // Add 'all' category conceptually handled by activeCategoryKey logic
+        setProducts(allProducts);
         setCategoriesData(builtCats);
       } catch (err) {
-        console.error('Error fetching menu', err);
+        console.error('Error loading menu', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchMenu();
-  }, [language]);
+    
+    loadMenu();
+  }, [language, t]);
 
   const normalisePrice = (raw) => {
     if (raw === null || raw === undefined) return 0;
