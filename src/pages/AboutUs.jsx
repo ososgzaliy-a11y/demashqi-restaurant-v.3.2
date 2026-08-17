@@ -6,7 +6,7 @@ export default function AboutUs() {
 
   return (
     <div className="fade-in">
-      <header className="page-header no-interaction" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(/Images/hero_shawarma.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <header className="page-header no-interaction" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: `linear-gradient(var(--dark-overlay), var(--dark-overlay)), url(${import.meta.env.BASE_URL}Images/hero_shawarma.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div className="container" style={{ textAlign: 'center', padding: '0 1rem' }}>
           <h1 className="scale-in" style={{ fontSize: 'clamp(2.2rem, 7vw, 5rem)', color: 'var(--gold)', textShadow: '0 8px 20px rgba(0,0,0,0.9)', marginBottom: '1rem' }}>
             {language === 'ar' ? 'قصتنا' : 'Our Story'}
@@ -55,10 +55,10 @@ export default function AboutUs() {
 
             <div style={{ flex: '1 1 400px', display: 'flex', gap: '1.5rem' }}>
               <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', border: '2px solid var(--border-color)', transition: 'transform 0.3s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                <img src="/Images/fatteh_syrian.png" alt="Syrian Fatteh" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img src={import.meta.env.BASE_URL + "Images/fatteh_syrian.png"} alt="Syrian Fatteh" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
               <div style={{ flex: 1, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', border: '2px solid var(--border-color)', transition: 'transform 0.3s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                <img src="/Images/qalbouza.png" alt="Qalbouza" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img src={import.meta.env.BASE_URL + "Images/qalbouza.png"} alt="Qalbouza" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
             </div>
           </div>

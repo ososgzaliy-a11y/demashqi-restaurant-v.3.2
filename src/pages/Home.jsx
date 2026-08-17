@@ -6,11 +6,11 @@ import { useCart } from '../context/CartContext';
 import ProductModal from '../components/ProductModal';
 
 // Import authentic images
-const HeroImage = '/Images/hero_shawarma.png';
-const StoryImage = '/Images/hero_shawarma.png'; // Using hero as story placeholder
-const Dish1Image = '/Images/hero_shawarma.png'; // Shawarma
-const Dish2Image = '/Images/fatteh_syrian.png'; // Fatteh
-const Dish3Image = '/Images/pizza_crispy.png'; // Crispy Chicken Pizza
+const HeroImage = import.meta.env.BASE_URL + 'Images/hero_shawarma.png';
+const StoryImage = import.meta.env.BASE_URL + 'Images/hero_shawarma.png'; // Using hero as story placeholder
+const Dish1Image = import.meta.env.BASE_URL + 'Images/hero_shawarma.png'; // Shawarma
+const Dish2Image = import.meta.env.BASE_URL + 'Images/fatteh_syrian.png'; // Fatteh
+const Dish3Image = import.meta.env.BASE_URL + 'Images/pizza_crispy.png'; // Crispy Chicken Pizza
 import OffersSlider from '../components/OffersSlider';
 
 export default function Home() {
