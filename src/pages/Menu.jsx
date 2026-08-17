@@ -8,7 +8,7 @@ import { searchMenuItems } from '../utils/searchUtils';
 import OffersSlider from '../components/OffersSlider';
 import ProductModal from '../components/ProductModal';
 
-const MenuHero = `/Images/hero_shawarma.png`;
+const MenuHero = import.meta.env.BASE_URL + 'Images/hero_shawarma.png';
 
 export default function Menu() {
   const API = import.meta.env.VITE_API_BASE_URL || '';
@@ -79,11 +79,11 @@ export default function Menu() {
 
   const getFallbackImageForCategory = (categoryKey) => {
     switch(categoryKey) {
-      case 'shawarma': return '/Images/hero_shawarma.png';
-      case 'fatteh': return '/Images/fatteh_syrian.png';
-      case 'pizza': return '/Images/pizza_crispy.png';
-      case 'inventions': return '/Images/qalbouza.png';
-      default: return `/Images/hero_shawarma.png`;
+      case 'shawarma': return import.meta.env.BASE_URL + 'Images/hero_shawarma.png';
+      case 'fatteh': return import.meta.env.BASE_URL + 'Images/fatteh_syrian.png';
+      case 'pizza': return import.meta.env.BASE_URL + 'Images/pizza_crispy.png';
+      case 'inventions': return import.meta.env.BASE_URL + 'Images/qalbouza.png';
+      default: return import.meta.env.BASE_URL + 'Images/hero_shawarma.png';
     }
   };
 
